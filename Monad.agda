@@ -4,15 +4,10 @@ module Monad where
 open import Cubical.Foundations.Prelude 
 open import Cubical.Foundations.HLevels
 open import Cubical.Data.Sigma.Base using (_×_) 
-open import Cubical.Foundations.Structure using (⟨_⟩)
 open import Cubical.Functions.Logic
--- open import Cubical.Data.Prod
---   hiding (map)
-open import Cubical.HITs.PropositionalTruncation as PT
-  hiding (map)
+open import Cubical.HITs.PropositionalTruncation as PT  hiding (map)
 import Cubical.HITs.PropositionalTruncation.Monad as TruncMonad
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
-open import Cubical.Data.Sum.Base using (_⊎_)
 
 variable
   X Y : Set
@@ -83,3 +78,12 @@ ret-left-id x f = funExt λ y → ⇔toPath
     λ {(x , x∈ , z∈) → rec (snd (((m >>= f) >>= g) z)) 
       (λ {(y , y∈ , z∈) → ∣ y , ∣ x , x∈ , y∈ ∣₁ , z∈ ∣₁}) z∈})  
   
+-- other monadic operators
+
+_=<<_ : {X Y : Set} → (X → ℙ Y) → ℙ X → ℙ Y
+f =<< m = m >>= f
+
+-- set monad
+
+_⊑_ : (X → ℙ Y) → (X → ℙ Y) → Set
+r ⊑ s = ∀ x → r x ⊆ s x
