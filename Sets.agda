@@ -1,98 +1,18 @@
 {-# OPTIONS --cubical #-}
+module Sets where
 
 open import Cubical.Foundations.Prelude 
 open import Cubical.Foundations.HLevels
 open import Cubical.Data.Sigma.Base using (_×_) 
 open import Cubical.Foundations.Structure using (⟨_⟩)
 open import Cubical.Functions.Logic
--- open import Cubical.Data.Prod
---   hiding (map)
-open import Cubical.HITs.PropositionalTruncation as PT
-  hiding (map)
+open import Cubical.HITs.PropositionalTruncation as PT hiding (map)
 import Cubical.HITs.PropositionalTruncation.Monad as TruncMonad
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
-open import Cubical.Data.Sum.Base using (_⊎_)
+open import Cubical.Data.Sum.Base using (_⊎_)    
 
 variable
   X Y : Set
-
-id : ∀ {l} {X : Set l} → X → X
-id x = x
-
-_∘_ : {X Y Z : Set} → (Y → Z) → (X → Y) → (X → Z)
-(f ∘ g) x = f (g x)
-
-map : (X → Y) → ℙ X → ℙ Y
-map {X} {Y} f xs y = ∥ Σ X (λ x → (x ∈ xs) × (f x ≡ y)) ∥₁ , squash₁
-
-incl : {X : Set} → (e₀ e₁ : ℙ X) 
-     -- → (∀ x → fst (e₀ x) → fst (e₁ x))
-     → (x : X) → ⟨ e₀ x ⇒ e₁ x ⟩
-incl e₀ e₁ x = {! rec (snd (e₁ x))   !} -- rec (snd (e₁ x)) (f x)
-
-map-id : (xs : ℙ X) → map id xs ≡ id xs
-map-id xs = funExt (λ x → ⇔toPath 
-             (rec (snd (xs x)) λ { (x , x∈xs , eq) → subst (λ w → fst (xs w)) eq x∈xs }) 
-              λ x∈xs → ∣ x , x∈xs , refl  ∣₁
-              )
-
-map-compose : {X Y Z : Set} → (f : X → Y) → (g : Y → Z)
-            → (xs : ℙ X) → map (g ∘ f) xs ≡ map g (map f xs)
-map-compose f g xs = funExt λ z → ⇔toPath 
-              (rec (snd (map g (map f xs) z)) 
-                   λ { (x , x∈xs , eq) → ∣ f x , ∣ x , x∈xs , refl ∣₁ , eq ∣₁ }) 
-              λ p → do (y , q , gy≡z) ← p
-                       (x , r , fx≡y) ← q 
-                       return (x , r , subst (λ w → g w ≡ z) (sym fx≡y) gy≡z)
-    where open TruncMonad
-{-                   
-              (rec (snd (map (g ∘ f) xs z)) 
-                  λ { (y , y∈fxs , eq₁) → 
-                   rec (snd (map (g ∘ f) xs z)) 
-                      (λ {(x , x∈xs , eq₂) → 
-                       ∣ x , x∈xs , subst (λ w → g w ≡ z) (sym eq₂) eq₁ ∣₁ }) y∈fxs  })
--}
-
-
-_>>=_ : {X Y : Set} → ℙ X → (X → ℙ Y) → ℙ Y
-(_>>=_ {X} {Y} xs f) y =  ∥ Σ X (λ x → fst (xs x) × fst (f x y)) ∥₁ , squash₁ -- prop := (prop, f prop)
-
-return : {X : Set} → X → ℙ X
-return x x' = ∥ x ≡ x' ∥₁ , squash₁
-
-
-ret-right-id : {X : Set} (m : ℙ X) 
-             → (m >>= return) ≡ m
-ret-right-id m = funExt λ x → ⇔toPath 
-                 (rec (snd (m x)) λ { (x' , x'∈m , eq') → 
-                    rec (snd (m x)) (λ eq → subst _ eq x'∈m) eq' })
-                  λ x∈m → ∣ x , x∈m , ∣ refl ∣₁ ∣₁ 
-    -- where open TruncMonad
-
-ret-right-id' : {X : Set} (m : ℙ X) 
-             → (m >>= return) ≡ m
-ret-right-id' m = funExt λ x → ⇔toPath (λ y → rec (snd (m x)) (λ { (x' , x'∈m , eq') → rec (snd (m x)) (λ x≡x' → subst (λ r → fst (m r)) x≡x' x'∈m) eq'})  y ) (λ prop → ∣  x , (prop , ∣ refl ∣₁) ∣₁)
-
-
-ret-left-id : {X : Set} (x : X) → (f : X → ℙ Y) 
-            → (return x >>= f) ≡ f x 
-ret-left-id x f = funExt λ y → ⇔toPath 
-  (rec (snd (f x y)) λ {(x' , x'∈ , y∈) → 
-    rec (snd (f x y)) (λ eq → subst _ (sym eq) y∈)  x'∈}) 
-  λ y∈ → ∣ x , ∣ refl ∣₁ , y∈ ∣₁  
-
->>=-assoc : {X Y Z : Set}
-  → (m : ℙ X) → (f : X → ℙ Y) → (g : Y → ℙ Z)
-  → (m >>= f) >>= g ≡ m >>= (λ x → f x >>= g)
->>=-assoc m f g = funExt λ z → ⇔toPath 
-  (rec (snd ((m >>= (λ x → f x >>= g)) z)) 
-    (λ { (y , y∈ , z∈) → rec (snd ((m >>= (λ x → f x >>= g)) z)) 
-           (λ {(x , x∈ , y∈) → ∣ x , x∈ , ∣ y , y∈ , z∈ ∣₁ ∣₁}) y∈})) 
-  (rec (snd (((m >>= f) >>= g) z)) 
-    λ {(x , x∈ , z∈) → rec (snd (((m >>= f) >>= g) z)) 
-      (λ {(y , y∈ , z∈) → ∣ y , ∣ x , x∈ , y∈ ∣₁ , z∈ ∣₁}) z∈})  
-  
--- union
 
 ∪-op : {X : Set} → ℙ X → ℙ X → ℙ X
 ∪-op A B x = ∥ (x ∈ A) ⊎ (x ∈ B) ∥₁ , squash₁ -- (x ∈ A ⊎ x ∈ B) ≡  ⟨ A x ⟩ ⊎ ⟨ B x ⟩
