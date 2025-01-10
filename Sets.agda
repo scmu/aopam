@@ -12,7 +12,7 @@ open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Cubical.Data.Sum.Base using (_⊎_)    
 
 variable
-  X Y : Set
+  X Y Z : Set
 
 ∪-op : {X : Set} → ℙ X → ℙ X → ℙ X
 ∪-op A B x = ∥ (x ∈ A) ⊎ (x ∈ B) ∥₁ , squash₁ -- (x ∈ A ⊎ x ∈ B) ≡  ⟨ A x ⟩ ⊎ ⟨ B x ⟩
@@ -85,8 +85,8 @@ _∩_ A B x = ((x ∈ A) × (x ∈ B)) , isProp× (P.∈-isProp A x) (P.∈-isPr
         helper2 x (_⊎_.inr x₁) = x₁ .fst , ∣ _⊎_.inr (x₁ .snd) ∣₁
 
 -- todo
-∪-∩-dist : {X : Set} → (A B C : ℙ X) → A ∪ (B ∩ C) ≡ (A ∪ B) ∩ (A ∪ C)
-∪-∩-dist {X} A B C = P.⊆-extensionality (A ∪ (B ∩ C)) ((A ∪ B) ∩ (A ∪ C)) {!   !}
+-- ∪-∩-dist : {X : Set} → (A B C : ℙ X) → A ∪ (B ∩ C) ≡ (A ∪ B) ∩ (A ∪ C)
+-- ∪-∩-dist {X} A B C = P.⊆-extensionality (A ∪ (B ∩ C)) ((A ∪ B) ∩ (A ∪ C)) {!   !}
 
 
 ⊆-∩-left : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆ A
