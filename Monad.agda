@@ -7,6 +7,7 @@ open import Cubical.Data.Sigma.Base using (_×_)
 open import Cubical.Functions.Logic hiding (_⊓_; _⊔_)
 open import Cubical.HITs.PropositionalTruncation as PT  hiding (map)
 import Cubical.HITs.PropositionalTruncation.Monad as TruncMonad
+open import Cubical.Data.Sum.Base using (_⊎_)
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 
 open import Sets
@@ -94,14 +95,13 @@ _⊑_ : (X → ℙ Y) → (X → ℙ Y) → Set
 r ⊑ s = ∀ x → r x ⊆ s x
 
 ⊑-trans : {r s t : X → ℙ Y} → r ⊑ s → s ⊑ t → r ⊑ t
-⊑-trans = {!   !}
+⊑-trans = λ r⊑s s⊑t x y y∈rx → s⊑t x y (r⊑s x y y∈rx)
 
 _⊒_ : (X → ℙ Y) → (X → ℙ Y) → Set
 r ⊒ s = s ⊑ r
 
 ⊒-trans : {r s t : X → ℙ Y} → r ⊒ s → s ⊒ t → r ⊒ t
-⊒-trans = {!   !}
-
+⊒-trans = λ r⊒s s⊒t x y y∈tx → r⊒s x y (s⊒t x y y∈tx)
 -- ⊓ and ⊔
 
 _⊓_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
@@ -111,15 +111,15 @@ _⊓_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
 
 ⊓-universal-⇒ : {r s t : X → ℙ Y}
               →  r ⊑ s ⊓ t  →  r ⊑ s × r ⊑ t
-⊓-universal-⇒ = {!   !}
+⊓-universal-⇒ = λ r⊑s⊓t → (λ x y y∈rx → fst (r⊑s⊓t x y y∈rx)) , λ x y y∈rx → snd (r⊑s⊓t x y y∈rx)
 
 ⊓-universal-⇐ : {r s t : X → ℙ Y}
               →  r ⊑ s × r ⊑ t  →  r ⊑ s ⊓ t
-⊓-universal-⇐ = {!   !}
+⊓-universal-⇐ = λ r⊑s×r⊑t x y y∈rx → (fst r⊑s×r⊑t x y y∈rx) , (snd r⊑s×r⊑t x y y∈rx)
 
 ⊓-monotonic : {r s t u : X → ℙ Y}
               → r ⊑ t → s ⊑ u → r ⊓ s ⊑ t ⊓ u
-⊓-monotonic = {!   !}
+⊓-monotonic = λ r⊑t s⊑u x y y∈r⊓s'x → r⊑t x y (fst (y∈r⊓s'x)) , s⊑u x y (snd (y∈r⊓s'x))
 
 _⊔_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
 (r ⊔ s) x = r x ∪ s x
@@ -128,15 +128,15 @@ _⊔_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
 
 ⊔-universal-⇒ : {r s t : X → ℙ Y}
               → r ⊔ s ⊑ t → r ⊑ t × s ⊑ t
-⊔-universal-⇒ = {!   !}
+⊔-universal-⇒ = λ r⊔s⊑t → (λ x y y∈rx → r⊔s⊑t x y ∣ _⊎_.inl y∈rx ∣₁) , λ x y y∈sx → r⊔s⊑t x y ∣ _⊎_.inr y∈sx ∣₁
 
 ⊔-universal-⇐ : {r s t : X → ℙ Y}
               → r ⊑ t × s ⊑ t → r ⊔ s ⊑ t
-⊔-universal-⇐ = {!   !}
+⊔-universal-⇐ {X} {Y} {r} {s} {t} r⊑t×s⊑t x y c∈r⊔s'b = rec (snd(t x y)) (λ {(_⊎_.inl y∈rx) → fst r⊑t×s⊑t x y y∈rx ; (_⊎_.inr y∈sx) → snd r⊑t×s⊑t x y y∈sx}) c∈r⊔s'b 
 
 ⊔-monotonic : {r s t u : X → ℙ Y}
               → r ⊑ t → s ⊑ u → r ⊔ s ⊑ t ⊔ u
-⊔-monotonic = {!   !}
+⊔-monotonic = λ r⊑t s⊑u x y y∈r⊔s'x → rec squash₁ (λ {(_⊎_.inl y∈rx) → ∣ _⊎_.inl (r⊑t x y y∈rx) ∣₁ ; (_⊎_.inr y∈sx) → ∣ _⊎_.inr (s⊑u x y y∈sx) ∣₁ }) y∈r⊔s'x 
 
   -- converse
 
@@ -153,11 +153,12 @@ _/_ : (X → ℙ Z) → (X → ℙ Y) → (Y → ℙ Z)
 
 /-universal-⇒ : (r : Y → ℙ Z) → (s : X → ℙ Y) → (t : X → ℙ Z) 
               → r <=< s ⊑ t → r ⊑ t / s
-/-universal-⇒ r s t = {!   !}
+/-universal-⇒ r s t = λ r<=<s⊑t y z z∈ry → ∣ (λ x y∈sx → r<=<s⊑t x z ∣ (y , y∈sx , z∈ry) ∣₁) ∣₁
 
 /-universal-⇐ : (r : Y → ℙ Z) → (s : X → ℙ Y) → (t : X → ℙ Z) 
               → r ⊑ t / s → r <=< s ⊑ t 
-/-universal-⇐ r s t = {!   !}
+/-universal-⇐ r s t = λ  r⊑t/s x z z∈r<=<s'x → rec (t x z .snd) (λ {(y , y∈sx , z∈ry) → rec (t x z .snd) (λ f → f x y∈sx) (r⊑t/s y z z∈ry) }) z∈r<=<s'x
 
 _↾_ : (s : X → ℙ Y) → (R : Y → ℙ Y) → X → ℙ Y
 s ↾ r = s ⊓ (r / (s °))
+  
