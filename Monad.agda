@@ -85,6 +85,9 @@ f =<< m = m >>= f
 _<=<_ : (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
 (f <=< g) x = f =<< g x
 
+_<$>_ : (X → Y) → ℙ X → ℙ Y
+f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
+
 -- set monad
 
 -- ⊑ and ⊒
