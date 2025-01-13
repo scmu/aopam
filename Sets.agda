@@ -94,3 +94,11 @@ _∩_ A B x = ((x ∈ A) × (x ∈ B)) , isProp× (P.∈-isProp A x) (P.∈-isPr
 
 ⊆-∩-right : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆ B
 ⊆-∩-right {X} A B = λ x z → z .snd
+
+
+-- ∪ and ⊆ 
+⊆-∪-monotonic-left : {X : Set} → (A B C : ℙ X) → A ⊆ B → (A ∪ C) ⊆ (B ∪ C)
+⊆-∪-monotonic-left {X} A B C  A⊆B x x∈A∪C  = rec squash₁ (λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (A⊆B x x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr x∈C ∣₁ }) x∈A∪C --  λ A⊆B x x∈A∪C → {!   !}
+
+⊆-∪-monotonic-right : {X : Set} → (A B C : ℙ X) → A ⊆ B → (C ∪ A) ⊆ (C ∪ B)
+⊆-∪-monotonic-right {X} A B C  A⊆B x x∈C∪A = rec squash₁ (λ {(_⊎_.inl x∈C) → ∣ _⊎_.inl x∈C ∣₁ ; (_⊎_.inr x∈A) → ∣ _⊎_.inr (A⊆B x x∈A) ∣₁ }) x∈C∪A

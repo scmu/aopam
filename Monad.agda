@@ -88,6 +88,14 @@ _<=<_ : (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
 _<$>_ : (X → Y) → ℙ X → ℙ Y
 f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
 
+-- monotonicity
+
+<$>-monotonic : {m0 m1 : ℙ X} → (f : X → Y) → m0 ⊆ m1 → (f <$> m0) ⊆ (f <$> m1)
+<$>-monotonic f m0⊆m1 y y∈f<$>m0 = rec squash₁ (λ z → ∣ z .fst , m0⊆m1 (z .fst) (z .snd .fst) , z .snd .snd ∣₁) y∈f<$>m0
+
+>>=-monotonic : {m0 m1 : ℙ X} → (f : X → ℙ Y) → m0 ⊆ m1 → (m0 >>= f) ⊆ (m1 >>= f)
+>>=-monotonic f m0⊆m1 p1 p2 = rec squash₁ (λ {( x , a∈m0 , b∈fa) → ∣ x , m0⊆m1 x a∈m0 , b∈fa ∣₁}) p2
+
 -- set monad
 
 -- ⊑ and ⊒
