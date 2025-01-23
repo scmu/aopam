@@ -14,6 +14,16 @@ open import Cubical.Data.Sum.Base using (_⊎_)
 variable
   X Y Z : Set
 
+{-
+Defined in Cubical.Foundations.Powerset.
+
+ℙ : Type ℓ → Type (ℓ-suc ℓ)
+ℙ X = X → hProp _ 
+    = X → Σ[ Y ∈ Type _] (isProp Y)
+    = X → Σ[ Y ∈ Type _] ((y₀ y₁ : Y) → y₀ ≡ y₁)
+-}
+
+
 ∪-op : {X : Set} → ℙ X → ℙ X → ℙ X
 ∪-op A B x = ∥ (x ∈ A) ⊎ (x ∈ B) ∥₁ , squash₁ -- (x ∈ A ⊎ x ∈ B) ≡  ⟨ A x ⟩ ⊎ ⟨ B x ⟩
 

@@ -170,6 +170,5 @@ _/_ : (X → ℙ Z) → (X → ℙ Y) → (Y → ℙ Z)
               → r ⊑ t / s → r <=< s ⊑ t 
 /-universal-⇐ r s t = λ  r⊑t/s x z z∈r<=<s'x → rec (t x z .snd) (λ {(y , y∈sx , z∈ry) → rec (t x z .snd) (λ f → f x y∈sx) (r⊑t/s y z z∈ry) }) z∈r<=<s'x
 
-_↾_ : (s : X → ℙ Y) → (R : Y → ℙ Y) → X → ℙ Y
-s ↾ r = s ⊓ (r / (s °))
+
   
