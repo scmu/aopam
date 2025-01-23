@@ -10,6 +10,7 @@ open import Cubical.HITs.PropositionalTruncation as PT hiding (map)
 import Cubical.HITs.PropositionalTruncation.Monad as TruncMonad
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Cubical.Data.Sum.Base using (_⊎_)    
+open import PowersetExt
 
 variable
   X Y Z : Set
@@ -99,16 +100,16 @@ _∩_ A B x = ((x ∈ A) × (x ∈ B)) , isProp× (P.∈-isProp A x) (P.∈-isPr
 -- ∪-∩-dist {X} A B C = P.⊆-extensionality (A ∪ (B ∩ C)) ((A ∪ B) ∩ (A ∪ C)) {!   !}
 
 
-⊆-∩-left : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆ A
-⊆-∩-left {X} A B = λ x z → z .fst
+⊆-∩-left : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆' A
+⊆-∩-left {X} A B = incl (A ∩ B) A (λ x z → z .fst)
 
-⊆-∩-right : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆ B
-⊆-∩-right {X} A B = λ x z → z .snd
+⊆-∩-right : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆' B
+⊆-∩-right {X} A B = incl (A ∩ B) B (λ x z → z .snd)
 
 
 -- ∪ and ⊆ 
-⊆-∪-monotonic-left : {X : Set} → (A B C : ℙ X) → A ⊆ B → (A ∪ C) ⊆ (B ∪ C)
-⊆-∪-monotonic-left {X} A B C  A⊆B x x∈A∪C  = rec squash₁ (λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (A⊆B x x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr x∈C ∣₁ }) x∈A∪C --  λ A⊆B x x∈A∪C → {!   !}
+⊆-∪-monotonic-left : {X : Set} → (A B C : ℙ X) → A ⊆' B → (A ∪ C) ⊆' (B ∪ C)
+⊆-∪-monotonic-left {X} A B C (incl .A .B A⊆B) = incl (A ∪ C) (B ∪ C) (λ x₁ x₂ → rec squash₁ ((λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (A⊆B x₁ x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr x∈C ∣₁ })) x₂)
 
-⊆-∪-monotonic-right : {X : Set} → (A B C : ℙ X) → A ⊆ B → (C ∪ A) ⊆ (C ∪ B)
-⊆-∪-monotonic-right {X} A B C  A⊆B x x∈C∪A = rec squash₁ (λ {(_⊎_.inl x∈C) → ∣ _⊎_.inl x∈C ∣₁ ; (_⊎_.inr x∈A) → ∣ _⊎_.inr (A⊆B x x∈A) ∣₁ }) x∈C∪A
+⊆-∪-monotonic-right : {X : Set} → (A B C : ℙ X) → A ⊆' B → (C ∪ A) ⊆' (C ∪ B)
+⊆-∪-monotonic-right {X} A B C (incl .A .B A⊆B) = incl (C ∪ A) (C ∪ B) (λ x₁ x₂ → rec squash₁ (λ { (_⊎_.inl x∈C) → ∣ _⊎_.inl x∈C ∣₁ ; (_⊎_.inr x∈A) → ∣ _⊎_.inr (A⊆B x₁ x∈A) ∣₁ }) x₂)

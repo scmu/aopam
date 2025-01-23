@@ -9,8 +9,9 @@ open import Cubical.HITs.PropositionalTruncation as PT  hiding (map)
 import Cubical.HITs.PropositionalTruncation.Monad as TruncMonad
 open import Cubical.Data.Sum.Base using (_⊎_)
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
-
 open import Sets
+open import PowersetExt
+
   
 id : ∀ {l} {X : Set l} → X → X
 id x = x
@@ -90,11 +91,11 @@ f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
 
 -- monotonicity
 
-<$>-monotonic : {m0 m1 : ℙ X} → (f : X → Y) → m0 ⊆ m1 → (f <$> m0) ⊆ (f <$> m1)
-<$>-monotonic f m0⊆m1 y y∈f<$>m0 = rec squash₁ (λ z → ∣ z .fst , m0⊆m1 (z .fst) (z .snd .fst) , z .snd .snd ∣₁) y∈f<$>m0
+<$>-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → Y) → m0 ⊆' m1 → (f <$> m0) ⊆' (f <$> m1)
+<$>-monotonic {x0} {x1} {m0} {m1} f (incl .m0 .m1 m0⊆m1) = incl (f <$> m0) (f <$> m1) λ x₁ x₂ → rec squash₁ (λ ( x0 , a∈m0 , eq)  → ∣ x0 , m0⊆m1 x0 a∈m0 , eq ∣₁ ) x₂
 
->>=-monotonic : {m0 m1 : ℙ X} → (f : X → ℙ Y) → m0 ⊆ m1 → (m0 >>= f) ⊆ (m1 >>= f)
->>=-monotonic f m0⊆m1 p1 p2 = rec squash₁ (λ {( x , a∈m0 , b∈fa) → ∣ x , m0⊆m1 x a∈m0 , b∈fa ∣₁}) p2
+>>=-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → ℙ Y) → m0 ⊆' m1 → (m0 >>= f) ⊆' (m1 >>= f)
+>>=-monotonic {x0} {x1} {m0} {m1}f (incl .m0 .m1 m0⊆m1) = incl (m0 >>= f) (m1 >>= f) λ x₁ x₂ → rec squash₁ (λ (x0 , x0∈m0 , x₁∈fx0) → ∣ x0 , m0⊆m1 x0 x0∈m0 , x₁∈fx0 ∣₁) x₂
 
 -- set monad
 
