@@ -19,13 +19,12 @@ s ↾ r = s ⊓ (r / (s °))
 ↾-universal-⇒₁ : {t s : X → ℙ Y} {r : Y → ℙ Y}
                  → t ⊑ s ↾ r 
                  → t ⊑ s
-↾-universal-⇒₁ = {!   !}  -- use property of ⊓
+↾-universal-⇒₁ {X} {Y} {t} {s} {r} t⊑s↾r = fst (⊓-universal-⇒ {X} {Y} {t} {s} {r / (s °)} t⊑s↾r) -- use property of ⊓
 
 ↾-universal-⇒₂ : {t s : X → ℙ Y} {r : Y → ℙ Y}
                  → t ⊑ s ↾ r 
                  → t <=< (s °) ⊑ r 
-↾-universal-⇒₂ = {!   !}
-
+↾-universal-⇒₂ {X} {Y} {t} {s} {r} t⊑s↾r = /-universal-⇐ t (s °) r (snd (⊓-universal-⇒ {X} {Y} {t} {s} {r / (s °)} t⊑s↾r))
 
 ↾-universal-⇒ : {t s : X → ℙ Y} {r : Y → ℙ Y}
                  → t ⊑ s ↾ r 
@@ -37,4 +36,4 @@ s ↾ r = s ⊓ (r / (s °))
 ↾-universal-⇐ : {t s : X → ℙ Y} {r : Y → ℙ Y}
                  → (t ⊑ s) × (t <=< (s °) ⊑ r)
                  → t ⊑ s ↾ r 
-↾-universal-⇐ = {!   !}           
+↾-universal-⇐ {X} {Y} {t} {s} {r} (t⊑s , t<=<s°⊑r) = ⊓-universal-⇐ {X} {Y} {t} {s} {r / (s °)} (t⊑s , /-universal-⇒ t (s °) r t<=<s°⊑r)
