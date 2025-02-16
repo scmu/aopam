@@ -4,6 +4,8 @@ module Reasoning where
 
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import PowersetExt
+open import Cubical.Foundations.Prelude 
+
 -- Properties of _⊆_
 private
     variable
@@ -15,7 +17,7 @@ trans = λ x₁ x₂ x₃ x₄ → x₂ x₃ (x₁ x₃ x₄)
 
 module ⊆-Reasoning {X : Set} where
   infix  1 ⊆begin_
-  infixr 2 _⊆⟨_⟩_
+  infixr 2 _⊆⟨_⟩_ 
   infix  3 _⊆∎
 
   ⊆begin_ : ∀ {x y : ℙ X} → x ⊆' y → x ⊆' y
@@ -29,7 +31,6 @@ module ⊆-Reasoning {X : Set} where
 
   reasoning : ∀ {x y : ℙ X} → x ⊆' y → x ⊆ y
   reasoning (incl _ _ p) = p 
-
 
 open ⊆-Reasoning public using (⊆begin_; _⊆⟨_⟩_; _⊆∎; reasoning)
 

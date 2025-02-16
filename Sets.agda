@@ -12,8 +12,9 @@ open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Cubical.Data.Sum.Base using (_⊎_)    
 open import PowersetExt
 
-variable
-  X Y Z : Set
+private
+  variable
+    X Y Z : Set
 
 {-
 Defined in Cubical.Foundations.Powerset.

@@ -12,12 +12,20 @@ open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Sets
 open import PowersetExt
 
-  
+
+variable
+  X Y Z : Set
+  ℓ ℓ₁ ℓ₂ ℓ₃ : Level
+
 id : ∀ {l} {X : Set l} → X → X
 id x = x
 
-_∘_ : (Y → Z) → (X → Y) → (X → Z)
-(f ∘ g) x = f (g x)
+-- _∘_ : (Y → Z) → (X → Y) → (X → Z)
+-- (f ∘ g) x = f (g x)
+
+_∘_ : {A : Type ℓ₁} {B : Type ℓ₂} {C : Type ℓ₃}
+     → (B → C) → (A → B) → (A → C)
+g ∘ f = λ x → g (f x)
 
 -- functor
 
@@ -77,25 +85,6 @@ ret-left-id x f = funExt λ y → ⇔toPath
   (rec (snd (((m >>= f) >>= g) z)) 
     λ {(x , x∈ , z∈) → rec (snd (((m >>= f) >>= g) z)) 
       (λ {(y , y∈ , z∈) → ∣ y , ∣ x , x∈ , y∈ ∣₁ , z∈ ∣₁}) z∈})  
-  
--- other monadic operators
-
-_=<<_ : (X → ℙ Y) → ℙ X → ℙ Y
-f =<< m = m >>= f
-
-_<=<_ : (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
-(f <=< g) x = f =<< g x
-
-_<$>_ : (X → Y) → ℙ X → ℙ Y
-f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
-
--- monotonicity
-
-<$>-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → Y) → m0 ⊆' m1 → (f <$> m0) ⊆' (f <$> m1)
-<$>-monotonic {x0} {x1} {m0} {m1} f (incl .m0 .m1 m0⊆m1) = incl (f <$> m0) (f <$> m1) λ x₁ x₂ → rec squash₁ (λ ( x0 , a∈m0 , eq)  → ∣ x0 , m0⊆m1 x0 a∈m0 , eq ∣₁ ) x₂
-
->>=-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → ℙ Y) → m0 ⊆' m1 → (m0 >>= f) ⊆' (m1 >>= f)
->>=-monotonic {x0} {x1} {m0} {m1}f (incl .m0 .m1 m0⊆m1) = incl (m0 >>= f) (m1 >>= f) λ x₁ x₂ → rec squash₁ (λ (x0 , x0∈m0 , x₁∈fx0) → ∣ x0 , m0⊆m1 x0 x0∈m0 , x₁∈fx0 ∣₁) x₂
 
 -- set monad
 
@@ -105,6 +94,9 @@ infixr 6 _⊑_ _⊒_
 
 _⊑_ : (X → ℙ Y) → (X → ℙ Y) → Set
 r ⊑ s = ∀ x → r x ⊆ s x
+
+⊑-refl : {A B : Set} → (r : A → ℙ B) → r ⊑ r
+⊑-refl = λ r x x₁ z → z
 
 ⊑-trans : {r s t : X → ℙ Y} → r ⊑ s → s ⊑ t → r ⊑ t
 ⊑-trans = λ r⊑s s⊑t x y y∈rx → s⊑t x y (r⊑s x y y∈rx)
@@ -149,6 +141,31 @@ _⊔_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
 ⊔-monotonic : {r s t u : X → ℙ Y}
               → r ⊑ t → s ⊑ u → r ⊔ s ⊑ t ⊔ u
 ⊔-monotonic = λ r⊑t s⊑u x y y∈r⊔s'x → rec squash₁ (λ {(_⊎_.inl y∈rx) → ∣ _⊎_.inl (r⊑t x y y∈rx) ∣₁ ; (_⊎_.inr y∈sx) → ∣ _⊎_.inr (s⊑u x y y∈sx) ∣₁ }) y∈r⊔s'x 
+  
+-- other monadic operators
+
+_=<<_ : (X → ℙ Y) → ℙ X → ℙ Y
+f =<< m = m >>= f
+
+_<=<_ : (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
+(f <=< g) x = f =<< g x
+
+_<$>_ : (X → Y) → ℙ X → ℙ Y
+f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
+
+-- monotonicity
+
+<$>-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → Y) → m0 ⊆' m1 → (f <$> m0) ⊆' (f <$> m1)
+<$>-monotonic {x0} {x1} {m0} {m1} f (incl .m0 .m1 m0⊆m1) = incl (f <$> m0) (f <$> m1) λ x₁ x₂ → rec squash₁ (λ ( x0 , a∈m0 , eq)  → ∣ x0 , m0⊆m1 x0 a∈m0 , eq ∣₁ ) x₂
+
+>>=-monotonic : ∀ {m0 m1 : ℙ X} → (f : X → ℙ Y) → m0 ⊆' m1 → (m0 >>= f) ⊆' (m1 >>= f)
+>>=-monotonic {x0} {x1} {m0} {m1} f (incl .m0 .m1 m0⊆m1) = incl (m0 >>= f) (m1 >>= f) λ x₁ x₂ → rec squash₁ (λ (x0 , x0∈m0 , x₁∈fx0) → ∣ x0 , m0⊆m1 x0 x0∈m0 , x₁∈fx0 ∣₁) x₂
+
+<=<-monotonic-left : ∀ {m0 m1 : Y → ℙ Z} → (f : X → ℙ Y) → m0 ⊑ m1 → (m0 <=< f) ⊑ (m1 <=< f)
+<=<-monotonic-left {Y} {Z} {X} {m0} {m1} f m0⊑m1 x z z∈m0<=<fx = rec squash₁ (λ {(y , y∈fx , z∈m0y) → ∣ y , y∈fx , m0⊑m1 y z z∈m0y ∣₁ }) z∈m0<=<fx
+
+<=<-monotonic-right : ∀ (m : Y → ℙ Z) → (f g : X → ℙ Y) → f ⊑ g → (m <=< f) ⊑ (m <=< g)
+<=<-monotonic-right {Y} {Z} {X} m f g f⊑g x z z∈m<=<fx = rec squash₁ (λ {(y , y∈fx , z∈my) → ∣ y , f⊑g x y y∈fx , z∈my ∣₁}) z∈m<=<fx
 
   -- converse
 
@@ -172,4 +189,16 @@ _/_ : (X → ℙ Z) → (X → ℙ Y) → (Y → ℙ Z)
 /-universal-⇐ r s t = λ  r⊑t/s x z z∈r<=<s'x → rec (t x z .snd) (λ {(y , y∈sx , z∈ry) → rec (t x z .snd) (λ f → f x y∈sx) (r⊑t/s y z z∈ry) }) z∈r<=<s'x
 
 
-  
+-- <=< properties
+R-trans : (R : X → ℙ X) → Type _
+R-trans R = ∀ x y z → y ∈ R x → z ∈ R y → z ∈ R x
+
+<=<-refl :  (R : X → ℙ X) → (R-trans R) → (R <=< R) ⊑ R
+<=<-refl R R-trans x x₁ x₁∈lhs = rec (P.∈-isProp (R x) x₁) (λ { (y , y∈Rx , z∈Ry) → R-trans x y x₁ y∈Rx z∈Ry}) x₁∈lhs
+
+<=<-assoc-left : (R S T : X → ℙ X) → (R <=< S) <=< T ⊑ R <=< (S <=< T)
+<=<-assoc-left R S T x x' x'∈lhs = rec squash₁ (λ {(y ,  y∈Tx , x'∈R<=<Sy) → rec squash₁ (λ {(z , z∈Sy , x'∈Rz) → ∣ z , ∣ y , y∈Tx , z∈Sy ∣₁ , x'∈Rz  ∣₁ }) x'∈R<=<Sy }) x'∈lhs
+
+<=<-assoc-right : (R S T : X → ℙ X) → R <=< (S <=< T) ⊑ (R <=< S) <=< T
+<=<-assoc-right R S T x x' x'∈lhs = rec squash₁ (λ {(z , z∈S<=<Tx , x'∈Rz) → rec squash₁ (λ z₁ →
+     ∣ z₁ .fst , z₁ .snd .fst , ∣ z , z₁ .snd .snd , x'∈Rz ∣₁ ∣₁) z∈S<=<Tx}) x'∈lhs 
