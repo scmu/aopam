@@ -46,7 +46,7 @@ instance MonadFail P where
 
 type List a = [a]
 
-max :: P a -> P a
+max :: P (List Int) -> P (List Int)
 max = undefined
 
 maxlist :: List a -> a
@@ -64,6 +64,13 @@ sse :: a -> a -> a
 sse = undefined
 
 wrap x = [x]
+
+leqs :: List Int -> List Int -> Bool
+leqs xs ys = sum xs <= sum ys
+
+geqs :: List Int -> List Int -> Bool
+geqs xs ys = sum xs >= sum ys
+
 \end{code}
 %endif
 
@@ -76,6 +83,9 @@ wrap x = [x]
 %include common/Relation.fmt
 
 %%\email{scm@iis.sinica.edu.tw}
+
+%format `leqs` = "\mathrel{\leq_{s}}"
+%format `geqs` = "\mathrel{\geq_{s}}"
 
 \usepackage{common/doubleequals}
 
@@ -169,10 +179,10 @@ suffix (x:xs)  = return (x:xs) <|> suffix xs {-"~~."-}
 \end{code}
 We get all segments by |prefix <=< suffix|.
 
-Let |max : P (List a) -> P (List a)| choose those lists having the largest sum.
+Let |max : P (List Int) -> P (List Int)| choose those lists having the largest sum.
 The \emph{maximum segment sum} problem can be defined by:
 \begin{code}
-mss :: List a -> P (List a)
+mss :: List Int -> P (List Int)
 mss = max . (prefix <=< suffix) {-"~~."-}
 \end{code}
 
@@ -181,7 +191,7 @@ mss = max . (prefix <=< suffix) {-"~~."-}
 The function |max| distributes into |join|:
 %if False
 \begin{code}
-propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
+-- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
 propMaxJoin xss = max (join xss) === max (join (fmap max xss))
 \end{code}
 %endif
@@ -307,6 +317,7 @@ proofScanLemmaInd f e x xs =
 \end{code}
 \end{proof}
 
+Fold and scan with deterministic step functions are themselves deterministic:
 \begin{align}
   |foldR (\x -> return . f x) (return e)| ~&=~ |return . foldr f e| \mbox{~~,}
     \notag\\
@@ -356,15 +367,19 @@ derMSPRes =
   max . prefix `spse` foldR maxPre (return []) {-"~~."-}
 \end{code}
 Recall the greedy theorem:
+%format y0
+%format y1
+%format b0
+%format b1
 \begin{spec}
 min_R . foldr f e `spse` foldr (\x -> min_R . f x) (min_R e)
    <==  do  (y0, y1) <- any
-            b1 <- f x y1
             filt R (y0, y1)
+            b1 <- f x y1
             return (y0, b1)  {-"~~"-}`sse`
           do  (b1, y0) <- any
-              b2 <- f x y0
-              filt R (b2, b1)
+              b0 <- f x y0
+              filt R (b0, b1)
               return (y0, b1){-"~~."-}
 \end{spec}
 For the MSS problem, the monotonicity condition is proved below:
@@ -374,12 +389,40 @@ For the MSS problem, the monotonicity condition is proved below:
 proofMonoMSS x =
 \end{code}
 %endif
-\begin{code}
-     do  (ys0, ys1) <- any
-         zs1 <- pre x ys1
-         -- filt R (ys0, ys1)
-         return (ys0, zs1)
-\end{code}
 
+%format ys0
+%format ys1
+%format zs0
+%format zs1
+
+\begin{code}
+        do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            zs1 <- pre x ys1
+            return (ys0, zs1)
+ ===    do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            zs1 <- (return [] <|> return (x : ys1))
+            return (ys0, zs1)
+ ===    do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            return (ys0, []) <|> return (ys0, x : ys1)
+ ===    do  (ys0, ys1) <- any
+            (  do { return (ys0, []) } <|>
+               do { guard (ys0 `geqs` ys1); return (ys0, x : ys1) } )
+ ===      {- |(`geqs`)| monotonic w.r.t |(:)| -}
+        do  (ys0, ys1) <- any
+            (  do { guard ([] `geqs` []); return (ys0, []) } <|>
+               do { guard ((x:ys0) `geqs` (x:ys1)); return (ys0, x : ys1) } )
+ `sse`  do  (ys0, ys1) <- any
+            zs0 <- (return [] <|> return (x:ys0))
+            (  do { guard (zs0 `geqs` []); return (ys0, []) } <|>
+               do { guard (zs0 `geqs` (x:ys1)); return (ys0, x : ys1) } )
+ `sse`  do  (zs1, ys0) <- any
+            zs0 <- (return [] <|> return (x:ys0))
+            guard (zs0 `geqs` zs1)
+            return (ys0, zs1)  {-"~~."-}
+\end{code}
+TODO: Gotta think about what basic laws we need to allow the proof above to go through.
 
 \end{document}
