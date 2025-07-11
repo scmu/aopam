@@ -12,3 +12,7 @@
 Notes/greedy.pdf
 
 Notes/mss.pdf
+
+*.blg
+
+Paper/monadic-opt.pdf

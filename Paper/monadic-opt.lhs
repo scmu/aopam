@@ -7,7 +7,7 @@
 \usepackage{subcaption}
 \usepackage{scalerel}
 
-%% lhs2Tex monadic-opt.lhs | pdflatex --jobname=monadic-opt
+%% lhs2TeX monadic-opt.lhs | pdflatex --jobname=monadic-opt
 
 %if False
 \begin{code}
@@ -94,11 +94,30 @@ The specification |mss| is a total function --- for each input it computes exact
 The final program and the specification are related by equality,
 which means that, for all input, the final program must yield exactly the same one result which |mss| would compute.
 
-Early examples of program calculation for such optimisation problems tend to 
+Textbook examples of program calculation for such optimisation problems tend to return the optimal value (in this case, the sum), rather than the solution that yields the optimal value (the list),
+because this approach would not be feasible otherwise.
+When there are multiple solutions that yield the optimal value.
+the specification, being a function, has to pick a particular one, which the implementation has to return.
+In the construction of a sorting algorithm, for example,
+having to decide, in the specification phase, what list to return when there are items having the same key would severely limit the algorithm one can derive (e.g., limiting one to construct stable sorting), if not making the specification impossible at all (it is hard to predict how, say, quicksort arranges items having the same keys).
+One therefore needs a different framework, where a specification describes a collection of solution that is allowed by the final program, which no longer equals the specification, but is rather contained by the latter.
 
+One of the possibilities is to use relations as specifications.
+Foundations of this approach were laid by works including \cite{BackhousedeBruin:91:Relational}, \cite{Aarts:92:Relational}, \cite{BackhouseHoogendijk:92:Elements}, etc,
+before \cite{BirddeMoor:97:Algebra},
+which took a even more abstract, categorical approach,
+presented general theories for constructing various forms of greedy, thinning, and dynamic programming algorithms.
+\cite{BirddeMoor:97:Algebra} presented a point-free calculus that is concise, elegant, and surprisingly expressive.
+Such conciseness and expressiveness also turned out to be a curse, however.
+For those who not sharing the background, the calculus has a sharp learning curve, which limited its popularity to a small circle of enthusiasts.
 
-%\bibliographystyle{jfplike}
-%\bibliography{bib}
+\cite{deMoorGibbons:00:Pointwise}
+\cite{BirdRabe:19:How}
+\cite{BirdGibbons:20:Algorithm}
+
+\bibliographystyle{jfplike}
+\bibliography{monadic-opt.bib}
 %\input{sublists.bbl}
+
 
 \end{document}
