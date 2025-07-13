@@ -49,4 +49,7 @@
 %format `unlhd` = "\unlhd"
 %format lhd = "(\lhd)"
 %format `lhd` = "\lhd"
+
+%format >>= = "\mathbin{>\!\!>\!\!=}"
+%format =<< = "\mathbin{=\!\!<\!\!<}"
 %endif
