@@ -42,8 +42,12 @@ infixr 0 ===
 \newcommand{\tagx}[1][]{\refstepcounter{equation}(\theequation)\label{#1}}
 \newcommand\numberthis{\refstepcounter{equation}\tag{\theequation}}
 
+\newcommand{\todo}[1]{{\color{brown}\lbrack{\bf to do}: #1 \rbrack}}
 
 \counterwithout{equation}{section}
+
+%format b0
+%format b1
 
 
 \begin{document}
@@ -100,20 +104,122 @@ When there are multiple solutions that yield the optimal value.
 the specification, being a function, has to pick a particular one, which the implementation has to return.
 In the construction of a sorting algorithm, for example,
 having to decide, in the specification phase, what list to return when there are items having the same key would severely limit the algorithm one can derive (e.g., limiting one to construct stable sorting), if not making the specification impossible at all (it is hard to predict how, say, quicksort arranges items having the same keys).
-One therefore needs a different framework, where a specification describes a collection of solution that is allowed by the final program, which no longer equals the specification, but is rather contained by the latter.
+One therefore needs a different framework, where a specification describes a collection of solution that is allowed by the final program, which no longer equals, but is instead contained by the specification.
 
 One of the possibilities is to use relations as specifications.
 Foundations of this approach were laid by works including \cite{BackhousedeBruin:91:Relational}, \cite{Aarts:92:Relational}, \cite{BackhouseHoogendijk:92:Elements}, etc,
-before \cite{BirddeMoor:97:Algebra},
-which took a even more abstract, categorical approach,
+before \cite{BirddeMoor:97:Algebra}, taking a more abstract, categorical approach,
 presented general theories for constructing various forms of greedy, thinning, and dynamic programming algorithms.
 \cite{BirddeMoor:97:Algebra} presented a point-free calculus that is concise, elegant, and surprisingly expressive.
+\todo{Why AoP is amazing}
 Such conciseness and expressiveness also turned out to be a curse, however.
 For those who not sharing the background, the calculus has a sharp learning curve, which limited its popularity to a small circle of enthusiasts.
+\todo{Why AoP can't be popular.}
 
-\cite{deMoorGibbons:00:Pointwise}
-\cite{BirdRabe:19:How}
-\cite{BirdGibbons:20:Algorithm}
+Efforts has been made to re-introduce variables back to the relational calculus, for example, \cite{deMoorGibbons:00:Pointwise}.
+One cannot help feeling unease with some of its peculiarities, for example
+\todo{What?}
+Around two decades later, \cite{BirdRabe:19:How} presented a theoretical background of ``multifunctions'',
+which was then used in
+\cite{BirdGibbons:20:Algorithm}.
+\todo{What is wrong with it?}
+
+\todo{Why we recommend using monads.}
+
+\section{Preliminaries}
+
+We introduce in this section the building blocks we need.
+
+\subsection{Nondeterminism Monad}
+
+A monad consists of a type constructor |M| and operators |return :: a -> M a| and |(>>=) :: M a -> (a -> M b) -> M b| that satisfy the \emph{monad laws}:
+\begin{align*}
+& \mbox{{\bf left identity}:}  & |return x >>= f| &= |f x| \mbox{~~,}\\
+& \mbox{{\bf right identity}:} & |m >>= return| &= |m|  \mbox{~~,}\\
+& \mbox{{\bf associativity}:}  &|(m >>= f) >>= g| &= |m >>= (\x -> f x >>= g)| \mbox{~~.}
+\end{align*}
+The operator |(>>) :: M a -> M b -> M b|, defined by |m >> n = m >>= (\_ -> n)|, ignores the result of |m| before executing |n|.
+A function |a -> b| can be lifted to monad |M| by the operator |(<$>)|:
+\begin{spec}
+(<$>) :: (a -> b) -> M a -> M b
+f <$> m = m >>= (return . f) {-"~~."-}
+\end{spec}
+In this paper we will also make extensive use of the reverse bind and the Kliseli composition:
+\begin{spec}
+(=<<) :: (a -> M b) -> M a -> M b
+f =<< m = m >>= f {-"~~,"-}
+
+(<=<) :: (b -> M c) -> (a -> M b) -> (a -> M c)
+(f <=< g) x = f =<< g x {-"~~."-}
+\end{spec}
+
+Non-determinism is the only effect we are concerned with in this article.
+For that we introduce two operators |mzero :: M a| and |mplus :: M a -> M a -> M a| that forms a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
+\begin{align*}
+  |mzero >>= f| &= |mzero| \mbox{~~,}\\
+  |f >> mzero|  &= |mzero| \mbox{~~,}\\
+  |m >>= (\x -> f x `mplus` g x)| &= |(m >>= f) `mplus` (m >>= g)| \mbox{~~,}\\
+  |(m `mplus` n) >>= f| &= |(m >>= f) `mplus` (n >>= f)| \mbox{~~.}
+\end{align*}
+Furthermore, |mplus| is assumed to be idempotent: |m `mplus` m = m|.
+
+The set |any :: P a| contains all elements having type |a|. Computationally, it creates an arbitrary element of an apporpriate type.
+The command |filt :: (a -> Bool) -> a -> P a| is defined by
+\begin{spec}
+filt p x  | p x        = return x
+          | otherwise  = fail {-"~~."-}
+\end{spec}
+
+\begin{spec}
+m `sse` n = (m `mplus` n = n) {-"~~."-}
+\end{spec}
+We also lift the relation to functions: |f `sse` g = (forall x , f x `sse` g x)|.
+
+
+
+\begin{spec}
+foldr :: (a -> b -> m b) -> m b -> List a -> m b
+foldr f e []      = e
+foldr f e (x:xs)  = f x =<< foldr f e xs {-"~~."-}
+\end{spec}
+
+
+\begin{spec}
+  h . foldr f e `spse` foldr g (h e) {-"\,"-}<=={-"\,"-} h (f x =<< m) `spse` g x =<< h m {-"~~"-}
+\end{spec}
+
+\paragraph*{Minimum}
+
+
+
+
+The new universal property of |min| is given by:
+%\begin{spec}
+%X `sse` min_R . f {-"\,"-}<=> {-"\,"-}  X `sse` f &&
+%                                        (  do  a   <- any
+%                                               b0  <- X a
+%                                               b1  <- f a
+%                                               return (b0, b1) {-"\,"-} `sse`
+%                                                 do  (b0, b1) <- any
+%                                                     filt R (b0, b1) {-"\,"-}) {-"~~."-}
+%\end{spec}
+\begin{equation*}
+|X `sse` min_R . f|\mbox{~~}|<=>|\mbox{~~} |X `sse` f &&|~
+\setlength{\jot}{-1pt}
+\left(
+ \begin{aligned}
+ |do|~ & |a <- any| \\
+       & |b0 <- X a| \\
+       & |b1 <- f a| \\
+       & |return (b0, b1)|
+ \end{aligned}
+ |`sse`|~~
+ \begin{aligned}
+ |do|~ & |(b0, b1) <- any| \\
+       & |filt R (b0, b1)|
+ \end{aligned}
+ \right)
+\end{equation*}
 
 \bibliographystyle{jfplike}
 \bibliography{monadic-opt.bib}
