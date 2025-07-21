@@ -54,7 +54,7 @@ record ThinQ {A : Type ℓ} (Q : A → ℙ A) : Type (ℓ-suc (ℓ-suc ℓ)) whe
     universal-property-⇒ : (xs ys : ℙ A) → (ys ∈ thin xs) → (ys ⊆ xs) × (∀ x → x ∈ xs → Σ A (λ y → (y ∈ ys) × (y ∈ Q x)))
     universal-property-⇐ : (xs ys : ℙ A) → (ys ⊆ xs) × (∀ x → x ∈ xs → Σ A (λ y → (y ∈ ys) × (y ∈ Q x))) → (ys ∈ thin xs)
      
-  thinning-theorem : ∀ {B : Type ℓ} (f : B → A → ℙ A) (e : ℙ A) (xs : List B) → (foldrM (λ x → thin ∘ {! \m -> (m >>= f x) !}) (thin e)) xs ⊆ (thin (foldrM f e xs))
+  thinning-theorem : ∀ {B : Type ℓ} (f : B → A → ℙ A) (e : ℙ A) (xs : List B) → (foldrM (λ x → thin ∘ \m -> m >>=' f x) (thin e)) xs ⊆ (thin (foldrM f e xs))
   thinning-theorem = {!   !}
 
 -- Approach 2:
