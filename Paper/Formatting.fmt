@@ -50,16 +50,4 @@
 %format lhd = "(\lhd)"
 %format `lhd` = "\lhd"
 
-%format >>= = "\mathbin{>\!\!>\!\!=}"
-%format >> = "\mathbin{>\!\!>}"
-%format =<< = "\mathbin{=\!\!<\!\!<}"
-%format <=< = "\mathbin{<\!\!=\!\!<}"
-%format <$> = "\mathbin{\langle\!\,\$\,\!\rangle}"
-
-%format mzero = "\emptyset"
-%format mplus = "({\lbrack\!\rbrack})"
-%format `mplus` = "\mathbin{\lbrack\!\rbrack}"
-%format `sse` = "\subseteq"
-%format `spse` = "\supseteq"
-
 %endif

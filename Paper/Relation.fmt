@@ -1,0 +1,42 @@
+%format min_R = "\mathit{min}_{\mathit{R}}"
+%format thin_Q = "\mathit{thin}_{\mathit{Q}}"
+%format `shrink` = "\!\upharpoonright\!"
+
+%format mem = "{\in}"
+%format ni  = "{\ni}"
+%format `cup` = "\cup"
+%format `cap` = "\mathrel{\cap}"
+
+%format `sse`  = "\subseteq"
+%format `spse` = "\supseteq"
+%format mzero  = "\emptyset"
+
+%format (conv f) = "{" f "}^{\circ}"
+%format alpha = "\alpha"
+
+%format Lam = "\Lambda\!"
+
+%format (cata (f)) = "(\!\lbrack" f "\rbrack\!)"
+
+%% Monads
+
+%format =<< = "\mathbin{\hstretch{0.5}{=\!\!<\!\!<}}"
+%format << = "\mathbin{\hstretch{0.7}{<\!\!<}}"
+%format >> = "\mathbin{\hstretch{0.7}{>\!\!>}}"
+%format >>= = "\mathrel{\hstretch{0.5}{>\!\!>\!\!=}}"
+%format <$> = "\mathrel{\raisebox{0.5\depth}{\scaleobj{0.5}{\langle}} \scaleobj{0.8}{\$} \raisebox{0.5\depth}{\scaleobj{0.5}{\rangle}}}"
+%format <.> = "\mathrel{\raisebox{0.5\depth}{\scaleobj{0.5}{\langle \bullet \rangle}}}"
+%format ^<< = "\mathbin{{\,}^{\wedge}\!\!\!\ll}"
+%format <=< = "\mathrel{\hstretch{0.5}{<\!\!=\!\!<}}"
+%format >=> = "\mathrel{\hstretch{0.7}{>\!\!=\!\!>}}"
+
+%format (split (f) (g)) = "\langle {" f "}, {" g "} \rangle"
+%format :* = "\times"
+%format `prod` = "\times"
+%format `lfac` = "\mathbin{\backslash}"
+
+%format <|> = "\mathrel{\lbrack\!\rbrack}"
+
+%format mzero = "\emptyset"
+%format mplus = "({\lbrack\!\rbrack})"
+%format `mplus` = "\mathrel{\lbrack\!\rbrack}"
