@@ -25,6 +25,8 @@ infixr 0 ===
 %include exists.fmt
 
 %include Formatting.fmt
+%include Relation.fmt
+
 
 %%\email{scm@iis.sinica.edu.tw}
 
@@ -48,6 +50,7 @@ infixr 0 ===
 
 %format b0
 %format b1
+%format Set1
 
 
 \begin{document}
@@ -144,6 +147,9 @@ A function |a -> b| can be lifted to monad |M| by the operator |(<$>)|:
 (<$>) :: (a -> b) -> M a -> M b
 f <$> m = m >>= (return . f) {-"~~."-}
 \end{spec}
+It follows easily from the monad laws that
+|id <$> m = m| and |(f . g) <$> m = f <$> (g <$> m)|, that is, |M| is a functor with |(<$>)| as its functorial map.
+
 In this paper we will also make extensive use of the reverse bind and the Kliseli composition:
 \begin{spec}
 (=<<) :: (a -> M b) -> M a -> M b
@@ -154,7 +160,7 @@ f =<< m = m >>= f {-"~~,"-}
 \end{spec}
 
 Non-determinism is the only effect we are concerned with in this article.
-For that we introduce two operators |mzero :: M a| and |mplus :: M a -> M a -> M a| that forms a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
+For that we introduce two operators |mzero :: M a| and |mplus :: M a -> M a -> M a| that form a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
 \begin{align*}
   |mzero >>= f| &= |mzero| \mbox{~~,}\\
   |f >> mzero|  &= |mzero| \mbox{~~,}\\
@@ -163,6 +169,17 @@ For that we introduce two operators |mzero :: M a| and |mplus :: M a -> M a -> M
 \end{align*}
 Furthermore, |mplus| is assumed to be idempotent: |m `mplus` m = m|.
 
+The inclusion relation of non-determinism monad is defined by:
+\begin{spec}
+m `sse` n = (m `mplus` n = n) {-"~~."-}
+\end{spec}
+We also lift the relation to functions: |f `sse` g = (forall x : f x `sse` g x)|.
+
+A structure that supports all the operations above is the set monad: for all type |a|,
+|m :: P a| is a set whose elements are of type |a|,
+|mzero| is the empty set, |mplus| is set union, |(`sse`)| is set inclusion, |return| forms a singleton set, and |m >>= f| is given by |union {f x || x <- m }|.
+For the rest of the paper we take |M = P|.
+
 The set |any :: P a| contains all elements having type |a|. Computationally, it creates an arbitrary element of an apporpriate type.
 The command |filt :: (a -> Bool) -> a -> P a| is defined by
 \begin{spec}
@@ -170,12 +187,27 @@ filt p x  | p x        = return x
           | otherwise  = fail {-"~~."-}
 \end{spec}
 
+\subsection{The Agda Model of Set Monad}
+
+To ensure that there is indeed a model of our set monad, we built one in Agda.
+A first attempt was to represent |P| by a predicate:
 \begin{spec}
-m `sse` n = (m `mplus` n = n) {-"~~."-}
+P : Set -> Set1
+P a = a -> Set {-"~~,"-}
 \end{spec}
-We also lift the relation to functions: |f `sse` g = (forall x , f x `sse` g x)|.
+and define |return| and |(>>=)| by
+\begin{spec}
+return x x' = x <=> x' {-"~~,"-}
+(m >>= f) y = exists ((\ x -> m x * f x y)) {-"~~."-}
+\end{spec}
+We would soon get stuck when we try to prove any of its properties.
+To prove the right identity law, for example, amounts to proving that
+\begin{spec}
+  (\y -> exists ((\x -> m x * x <=> y))) <=> m {-"~~."-}
+\end{spec}
 
 
+\subsection{Monadic Fold}
 
 \begin{spec}
 foldr :: (a -> b -> m b) -> m b -> List a -> m b
