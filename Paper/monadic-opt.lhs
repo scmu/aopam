@@ -137,8 +137,8 @@ We introduce in this section the building blocks we need.
 
 A monad consists of a type constructor |M| and operators |return :: a -> M a| and |(>>=) :: M a -> (a -> M b) -> M b| that satisfy the \emph{monad laws}:
 \begin{align*}
-& \mbox{{\bf left identity}:}  & |return x >>= f| &= |f x| \mbox{~~,}\\
 & \mbox{{\bf right identity}:} & |m >>= return| &= |m|  \mbox{~~,}\\
+& \mbox{{\bf left identity}:}  & |return x >>= f| &= |f x| \mbox{~~,}\\
 & \mbox{{\bf associativity}:}  &|(m >>= f) >>= g| &= |m >>= (\x -> f x >>= g)| \mbox{~~.}
 \end{align*}
 The operator |(>>) :: M a -> M b -> M b|, defined by |m >> n = m >>= (\_ -> n)|, ignores the result of |m| before executing |n|.
@@ -159,20 +159,22 @@ f =<< m = m >>= f {-"~~,"-}
 (f <=< g) x = f =<< g x {-"~~."-}
 \end{spec}
 
-Non-determinism is the only effect we are concerned with in this article.
-For that we introduce two operators |mzero :: M a| and |mplus :: M a -> M a -> M a| that form a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
+Non-determinism is the only effect we are concerned with in this article: |M a| denotes a nondeterministic computataion that yields zero, one, or some values of type |a|.
+We let |mplus :: M a -> M a -> M a| denote nondeterministic choice and |mzero :: M a| failure. Together they form a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
 \begin{align*}
   |mzero >>= f| &= |mzero| \mbox{~~,}\\
   |f >> mzero|  &= |mzero| \mbox{~~,}\\
   |m >>= (\x -> f x `mplus` g x)| &= |(m >>= f) `mplus` (m >>= g)| \mbox{~~,}\\
   |(m `mplus` n) >>= f| &= |(m >>= f) `mplus` (n >>= f)| \mbox{~~.}
 \end{align*}
-Furthermore, |mplus| is assumed to be idempotent: |m `mplus` m = m|.
+Furthermore, |mplus| is assumed to be commutative (|m `mplus` n = n `mplus` m|) and idempotent (|m `mplus` m = m|).
 
 The inclusion relation of non-determinism monad is defined by:
 \begin{spec}
 m `sse` n = (m `mplus` n = n) {-"~~."-}
 \end{spec}
+When |m `sse` n|, we say that |m| refines |n|.
+Every value |m| might yield is a value allowed by |n|.
 We also lift the relation to functions: |f `sse` g = (forall x : f x `sse` g x)|.
 
 A structure that supports all the operations above is the set monad: for all type |a|,
@@ -180,32 +182,43 @@ A structure that supports all the operations above is the set monad: for all typ
 |mzero| is the empty set, |mplus| is set union, |(`sse`)| is set inclusion, |return| forms a singleton set, and |m >>= f| is given by |union {f x || x <- m }|.
 For the rest of the paper we take |M = P|.
 
-The set |any :: P a| contains all elements having type |a|. Computationally, it creates an arbitrary element of an apporpriate type.
-The command |filt :: (a -> Bool) -> a -> P a| is defined by
+The set |any : P a| contains all elements having type |a|.
+Computationally, it creates an arbitrary element of an appropriate type.
+The command |filt : (a -> Bool) -> a -> P a| is defined by
 \begin{spec}
 filt p x  | p x        = return x
           | otherwise  = fail {-"~~."-}
 \end{spec}
+It returns its input if it satisfies |p|, and fails otherwise.
 
 \subsection{The Agda Model of Set Monad}
 
 To ensure that there is indeed a model of our set monad, we built one in Agda.
-A first attempt was to represent |P| by a predicate:
+A first attempt was to represent a set |P| by its characteristic predicate:
 \begin{spec}
 P : Set -> Set1
-P a = a -> Set {-"~~,"-}
+P a = a -> Set {-"~~."-}
 \end{spec}
-and define |return| and |(>>=)| by
+Given |x : a|, |P x| is a type, or a proposition, stating the conditions underwhich |x| is a member of the set denoted by |P x|.
+Monad operators |return| and |(>>=)| are defined by
 \begin{spec}
-return x x' = x <=> x' {-"~~,"-}
-(m >>= f) y = exists ((\ x -> m x * f x y)) {-"~~."-}
+return x  = \y ->  x <=> y {-"~~,"-}
+m >>= f   = \y -> Sum[x `mem` _] (m x * f x y) {-"~~,"-}
 \end{spec}
-We would soon get stuck when we try to prove any of its properties.
-To prove the right identity law, for example, amounts to proving that
-\begin{spec}
-  (\y -> exists ((\x -> m x * x <=> y))) <=> m {-"~~."-}
-\end{spec}
+where |(<=>)| is propositional equality, and |Sum| denotes dependent pair.
+That is, |y| is a member of |return x| only if |x <=> y|,
+and |y| is a member of |m >>= f| if there exists a witness |x|, presented in the dependent pair, that is a member of the set |m|, and |y| is a member of the set |f x|.
 
+We would soon get stuck when we try to prove any of its properties.
+To prove the right identity law |m >>= return = m|, for example, amounts to proving that
+\begin{spec}
+  (\y -> Sum [x `mem` _] (m x * x <=> y)) <=> m {-"~~."-}
+\end{spec}
+The righthand side |m| is a function that yields a type,
+while the lefthand side is a function that, \todo{explain better}.
+While logically we recognize that they are equivalent, in the type theory of Agda the two sides are different, albeit isomorphic, types.
+
+\todo{Cubical Agda}
 
 \subsection{Monadic Fold}
 

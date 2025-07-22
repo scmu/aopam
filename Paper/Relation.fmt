@@ -3,6 +3,7 @@
 %format `shrink` = "\!\upharpoonright\!"
 
 %format mem = "{\in}"
+%format `mem` = "\mathbin{\in}"
 %format ni  = "{\ni}"
 %format `cup` = "\cup"
 %format `cap` = "\mathrel{\cap}"
@@ -40,3 +41,5 @@
 %format mzero = "\emptyset"
 %format mplus = "({\lbrack\!\rbrack})"
 %format `mplus` = "\mathrel{\lbrack\!\rbrack}"
+
+%format Sum = "\Sigma"

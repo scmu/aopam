@@ -50,4 +50,6 @@
 %format lhd = "(\lhd)"
 %format `lhd` = "\lhd"
 
+%format * = "\times"
+
 %endif
