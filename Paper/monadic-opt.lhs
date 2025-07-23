@@ -50,6 +50,8 @@ infixr 0 ===
 
 %format b0
 %format b1
+%format y0
+%format y1
 %format Set1
 
 
@@ -159,7 +161,7 @@ f =<< m = m >>= f {-"~~,"-}
 (f <=< g) x = f =<< g x {-"~~."-}
 \end{spec}
 
-Non-determinism is the only effect we are concerned with in this article: |M a| denotes a nondeterministic computataion that yields zero, one, or some values of type |a|.
+Non-determinism is the only effect we are concerned with in this article: |M a| denotes a nondeterministic computation that may yield zero, one, or more values of type |a|.
 We let |mplus :: M a -> M a -> M a| denote nondeterministic choice and |mzero :: M a| failure. Together they form a monoid (that is, |mplus| is associative with |mzero| as its identity element) and satisfy the following laws:
 \begin{align*}
   |mzero >>= f| &= |mzero| \mbox{~~,}\\
@@ -167,7 +169,7 @@ We let |mplus :: M a -> M a -> M a| denote nondeterministic choice and |mzero ::
   |m >>= (\x -> f x `mplus` g x)| &= |(m >>= f) `mplus` (m >>= g)| \mbox{~~,}\\
   |(m `mplus` n) >>= f| &= |(m >>= f) `mplus` (n >>= f)| \mbox{~~.}
 \end{align*}
-Furthermore, |mplus| is assumed to be commutative (|m `mplus` n = n `mplus` m|) and idempotent (|m `mplus` m = m|).
+Furthermore, |mplus| is commutative (|m `mplus` n = n `mplus` m|) and idempotent (|m `mplus` m = m|).
 
 The inclusion relation of non-determinism monad is defined by:
 \begin{spec}
@@ -183,15 +185,15 @@ A structure that supports all the operations above is the set monad: for all typ
 For the rest of the paper we take |M = P|.
 
 The set |any : P a| contains all elements having type |a|.
-Computationally, it creates an arbitrary element of an appropriate type.
+Computationally, it creates an arbitrary element of its type.
 The command |filt : (a -> Bool) -> a -> P a| is defined by
 \begin{spec}
 filt p x  | p x        = return x
           | otherwise  = fail {-"~~."-}
 \end{spec}
-It returns its input if it satisfies |p|, and fails otherwise.
+It returns its input |x| if it satisfies |p|, and fails otherwise.
 
-\subsection{The Agda Model of Set Monad}
+\subsection{An Agda Model of Set Monad}
 
 To ensure that there is indeed a model of our set monad, we built one in Agda.
 A first attempt was to represent a set |P| by its characteristic predicate:
@@ -199,43 +201,62 @@ A first attempt was to represent a set |P| by its characteristic predicate:
 P : Set -> Set1
 P a = a -> Set {-"~~."-}
 \end{spec}
-Given |x : a|, |P x| is a type, or a proposition, stating the conditions underwhich |x| is a member of the set denoted by |P x|.
+Given |x : a|, |P x| is a type, or a proposition, stating the conditions under which |x| is in the set denoted by |P x|.
 Monad operators |return| and |(>>=)| are defined by
 \begin{spec}
+return : {a : Set} -> a -> P a
 return x  = \y ->  x <=> y {-"~~,"-}
-m >>= f   = \y -> Sum[x `mem` _] (m x * f x y) {-"~~,"-}
+(>>=) : {a b : Set} -> P a -> (a -> P b) -> P b
+m >>= f   = \y -> Sum{-"\!"-}[x `mem` a] (m x * f x y) {-"~~,"-}
 \end{spec}
 where |(<=>)| is propositional equality, and |Sum| denotes dependent pair.
-That is, |y| is a member of |return x| only if |x <=> y|,
+That is, |y| is a member of the set |return x| exactly when |x <=> y|,
 and |y| is a member of |m >>= f| if there exists a witness |x|, presented in the dependent pair, that is a member of the set |m|, and |y| is a member of the set |f x|.
 
 We would soon get stuck when we try to prove any of its properties.
 To prove the right identity law |m >>= return = m|, for example, amounts to proving that
 \begin{spec}
-  (\y -> Sum [x `mem` _] (m x * x <=> y)) <=> m {-"~~."-}
+  (\y -> Sum{-"\!"-}[x `mem` a] (m x * x <=> y)) {-"~"-}<=>{-"~"-} m {-"~~."-}
 \end{spec}
-The righthand side |m| is a function that yields a type,
-while the lefthand side is a function that, \todo{explain better}.
+The righthand side |m| is a function which yields, for each member |y|, a proof that |y| is in |m|,
+while the lefthand side is a function which produces, for each member |y|, a dependent pair consisting of a value |x : a| , a proof that |x| is in |m|, and a proof that |x <=> y|.
 While logically we recognize that they are equivalent, in the type theory of Agda the two sides are different, albeit isomorphic, types.
 
 \todo{Cubical Agda}
 
-\subsection{Monadic Fold}
+\subsection{Monadic Fold and Minimum}
 
+We define the monadic fold on lists as:
 \begin{spec}
-foldr :: (a -> b -> m b) -> m b -> List a -> m b
-foldr f e []      = e
-foldr f e (x:xs)  = f x =<< foldr f e xs {-"~~."-}
+foldR :: (a -> b -> P b) -> P b -> List a -> P b
+foldR f e []      = e
+foldR f e (x:xs)  = f x =<< foldR f e xs {-"~~."-}
 \end{spec}
+Given |h :: List a -> P b|, sufficient conditions for |h| to include or be included by |foldR f e| are given by:
+\begin{align}
+|foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}|\\
+|h `sse` foldR f e| & |{-"~"-}<=={-"~"-} h [] `sse` e {-"\,"-}&&{-"\,"-} h (x:xs) `sse` f x =<< h xs  {-"~~."-}|
+\end{align}
+The properties above can be proved by routine induction on the input list.
+One may then prove the following |foldR| fusion rule:
+\begin{equation}
+  |foldR g (h e) `sse` h . foldR f e {-"~"-}<=={-"~"-} g x =<< h m `sse` h (f x =<< m) {-"~~."-}|
+\end{equation}
 
 
-\begin{spec}
-  h . foldr f e `spse` foldr g (h e) {-"\,"-}<=={-"\,"-} h (f x =<< m) `spse` g x =<< h m {-"~~"-}
-\end{spec}
-
-\paragraph*{Minimum}
-
-
+The function |min :: P a -> P a| takes a set and returns a refined set that keeps all the minimum elements, and only these elements.
+In set-theoretical notation, |min| can be defined by the following equivalence:
+for all |xs| and |ys|,
+\begin{equation}
+|ys `sse` min xs {-"~"-}<==>{-"~"-} ys `sse` xs && (forall y `mem` ys : (forall x `mem` xs : y <= x)) {-"~~."-}|
+\label{eq:min-def-set}
+\end{equation}
+Letting |ys = min xs|, the |(==>)| direction of \eqref{eq:min-def-set} says that |min xs| is a subset of |xs|, and every member in |min xs| is no greater than any member in |xs|. The |(<==)| direction says that |min xs| is the largest such set --- any |ys| satisfying the righthand side is a subset of |min xs|.
+For calculation, however, the following \emph{universal property} of |min| is more useful: for all |h| and |f|:
+\begin{equation}
+|h `sse` min . f {-"~"-}<==>{-"~"-} h `sse` f && (forall x : (forall y0 `mem` h x : (forall y1 `mem` f x : y0 <= y1))) {-"~~."-}|
+\label{eq:min-univ-set}
+\end{equation}
 
 
 The new universal property of |min| is given by:
@@ -249,7 +270,7 @@ The new universal property of |min| is given by:
 %                                                     filt R (b0, b1) {-"\,"-}) {-"~~."-}
 %\end{spec}
 \begin{equation*}
-|X `sse` min_R . f|\mbox{~~}|<=>|\mbox{~~} |X `sse` f &&|~
+|h `sse` min_R . f|\mbox{~~}|<==>|\mbox{~~} |h `sse` f &&|~
 \setlength{\jot}{-1pt}
 \left(
  \begin{aligned}
