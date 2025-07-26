@@ -42,4 +42,9 @@
 %format mplus = "({\lbrack\!\rbrack})"
 %format `mplus` = "\mathrel{\lbrack\!\rbrack}"
 
+%format unlhd = "(\unlhd)"
+%format `unlhd` = "\unlhd"
+%format lhd = "(\lhd)"
+%format `lhd` = "\lhd"
+
 %format Sum = "\Sigma"

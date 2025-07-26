@@ -45,11 +45,6 @@
 
 %format === = "\mathrel{=}"
 
-%format unlhd = "(\unlhd)"
-%format `unlhd` = "\unlhd"
-%format lhd = "(\lhd)"
-%format `lhd` = "\lhd"
-
 %format * = "\times"
 
 %endif

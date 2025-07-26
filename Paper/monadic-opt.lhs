@@ -171,7 +171,7 @@ We let |mplus :: M a -> M a -> M a| denote nondeterministic choice and |mzero ::
 \end{align*}
 Furthermore, |mplus| is commutative (|m `mplus` n = n `mplus` m|) and idempotent (|m `mplus` m = m|).
 
-The inclusion relation of non-determinism monad is defined by:
+The containment relation of non-determinism monad is defined by:
 \begin{spec}
 m `sse` n = (m `mplus` n = n) {-"~~."-}
 \end{spec}
@@ -224,7 +224,7 @@ While logically we recognize that they are equivalent, in the type theory of Agd
 
 \todo{Cubical Agda}
 
-\subsection{Monadic Fold and Minimum}
+\subsection{Monadic Fold}
 
 We define the monadic fold on lists as:
 \begin{spec}
@@ -232,9 +232,9 @@ foldR :: (a -> b -> P b) -> P b -> List a -> P b
 foldR f e []      = e
 foldR f e (x:xs)  = f x =<< foldR f e xs {-"~~."-}
 \end{spec}
-Given |h :: List a -> P b|, sufficient conditions for |h| to include or be included by |foldR f e| are given by:
+Given |h :: List a -> P b|, sufficient conditions for |h| to contain or be contained by |foldR f e| are given by:
 \begin{align}
-|foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}|\\
+|foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}| \label{eq:foldR-comp} \\
 |h `sse` foldR f e| & |{-"~"-}<=={-"~"-} h [] `sse` e {-"\,"-}&&{-"\,"-} h (x:xs) `sse` f x =<< h xs  {-"~~."-}|
 \end{align}
 The properties above can be proved by routine induction on the input list.
@@ -243,23 +243,46 @@ One may then prove the following |foldR| fusion rule:
   |foldR g (h e) `sse` h . foldR f e {-"~"-}<=={-"~"-} g x =<< h m `sse` h (f x =<< m) {-"~~."-}|
 \end{equation}
 
+%format f0
+%format f1
+%format e0
+%format e1
+With \eqref{eq:foldR-comp} it is easy to show that |foldR| is monotonic:
+\begin{equation*}
+|foldR f0 e0 `sse` foldR f1 e1 {-"~"-}<=={-"~"-} f0 `sse` f1 && e0 `sse` e1  {-"~~."-}|
+\end{equation*}
+Note that in |f0 `sse` f1|, set inclusion is lifted to denote |f0 x y `sse` f1 x y| for all |x| and |y|.
 
-The function |min :: P a -> P a| takes a set and returns a refined set that keeps all the minimum elements, and only these elements.
+Finally, monadic |foldR| can be refined to pure |foldr| if both of its arguments are pure:
+\begin{equation*}
+|return (foldr f e) = foldR (\x -> return . f x) (return e) {-"~~."-}|
+\end{equation*}
+
+\subsection{Minimum}
+
+Consider a binary relation |unlhd| on some type |a|.
+An value |x :: a| is a minimum of |xs :: P a| if |x| is in |xs|, and for every element |y `elem` xs| we have |x `unlhd` y|.
+The definition itself does not assume much from |unlhd|.
+In particular, since |unlhd| might not be anti-symmetric, minimum elements might not be unique.
+The function |min :: P a -> P a| takes a set and returns a refined set that keeps all the minimum elements and nothing else.
 In set-theoretical notation, |min| can be defined by the following equivalence:
 for all |xs| and |ys|,
 \begin{equation}
-|ys `sse` min xs {-"~"-}<==>{-"~"-} ys `sse` xs && (forall y `mem` ys : (forall x `mem` xs : y <= x)) {-"~~."-}|
+|ys `sse` min xs {-"~"-}<==>{-"~"-} ys `sse` xs && (forall y `mem` ys : (forall x `mem` xs : y `unlhd` x)) {-"~~."-}|
 \label{eq:min-def-set}
 \end{equation}
 Letting |ys = min xs|, the |(==>)| direction of \eqref{eq:min-def-set} says that |min xs| is a subset of |xs|, and every member in |min xs| is no greater than any member in |xs|. The |(<==)| direction says that |min xs| is the largest such set --- any |ys| satisfying the righthand side is a subset of |min xs|.
-For calculation, however, the following \emph{universal property} of |min| is more useful: for all |h| and |f|:
+
+In calculation, we often want to refine expressions of the form |min . f| where |f| generates a set. Therefore the following \emph{universal property} of |min| is more useful: for all |h| and |f| of type |a -> P b|,
 \begin{equation}
-|h `sse` min . f {-"~"-}<==>{-"~"-} h `sse` f && (forall x : (forall y0 `mem` h x : (forall y1 `mem` f x : y0 <= y1))) {-"~~."-}|
+|h `sse` min . f {-"~"-}<==>{-"~"-} h `sse` f && (forall x : (forall y0 `mem` h x : (forall y1 `mem` f x : y0 `unlhd` y1))) {-"~~."-}|
 \label{eq:min-univ-set}
 \end{equation}
+Properties \eqref{eq:min-def-set} and \eqref{eq:min-univ-set} are equivalent.
+\todo{argue for that}
 
-
-The new universal property of |min| is given by:
+The aim of our work, however, is to capture the ideas above in a monadic notation, such that programs can be manipulated and reasoned about in the monadic language.
+It turns out that \eqref{eq:min-univ-set} can be rewritten monadically as below:
 %\begin{spec}
 %X `sse` min_R . f {-"\,"-}<=> {-"\,"-}  X `sse` f &&
 %                                        (  do  a   <- any
@@ -269,23 +292,56 @@ The new universal property of |min| is given by:
 %                                                 do  (b0, b1) <- any
 %                                                     filt R (b0, b1) {-"\,"-}) {-"~~."-}
 %\end{spec}
-\begin{equation*}
-|h `sse` min_R . f|\mbox{~~}|<==>|\mbox{~~} |h `sse` f &&|~
+\begin{equation}
+|h `sse` min . f|\mbox{~~}|<==>|\mbox{~~} |h `sse` f &&|~
 \setlength{\jot}{-1pt}
 \left(
  \begin{aligned}
- |do|~ & |a <- any| \\
-       & |b0 <- X a| \\
-       & |b1 <- f a| \\
-       & |return (b0, b1)|
+ |do|~ & |x <- any| \\
+       & |y0 <- h x| \\
+       & |y1 <- f x| \\
+       & |return (y0, y1)|
  \end{aligned}
  |`sse`|~~
  \begin{aligned}
- |do|~ & |(b0, b1) <- any| \\
-       & |filt R (b0, b1)|
+ |do|~ & |(y0, y1) <- any| \\
+       & |filt unlhd (y0, y1)|
  \end{aligned}
  \right)
+ \label{eq:min-univ-monadic}
+\end{equation}
+In \eqref{eq:min-univ-monadic} and from now on we abuse the notation a bit,
+using |filt unlhd| to denote |filt (\(y,z) -> y `unlhd` z)|.
+The large pair of parentheses in \eqref{eq:min-univ-monadic} relates two monadic values. On the lefthand side we non-deterministically generate a pair of values |y0| and |y1|, which are respectively a result of |h| and |f| for an arbitrary input |x|. The inclusion says that |(y0, y1)| must be contained by the monad on the righthand side, which contains all pairs |(y0, y1)| as long as |y0 `unlhd` y1|.
+
+By defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; return (y,z) }|,
+\eqref{eq:min-univ-monadic} can be written more concisely as below:
+\begin{equation*}
+|h `sse` min_R . f|\mbox{~~}|<==>|\mbox{~~} |h `sse` f &&|~
+|split h f =<< any {-"\,"-}`sse`{-"\,"-} filt unlhd =<< any|.
 \end{equation*}
+
+Letting |h = min . f| in \eqref{eq:min-univ-monadic}, we get the |min|-cancelation law:
+\begin{equation}
+\setlength{\jot}{-1pt}
+ \begin{aligned}
+ |do|~ & |x <- any| \\
+       & |y0 <- min (f x)| \\
+       & |y1 <- f x| \\
+       & |return (y0, y1)|
+ \end{aligned}
+ |`sse`|~~
+ \begin{aligned}
+ |do|~ & |(y0, y1) <- any| \\
+       & |filt unlhd (y0, y1)|
+ \end{aligned}
+ \label{eq:min-cancelation}
+\end{equation}
+
+\paragraph*{In the Agda Model}
+ we implement |min| by:
+
+It is then proved in Agda that the above implementation satisfies \eqref{eq:min-univ-monadic}.
 
 \bibliographystyle{jfplike}
 \bibliography{monadic-opt.bib}
