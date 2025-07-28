@@ -1,4 +1,5 @@
 %format min_R = "\mathit{min}_{\mathit{R}}"
+%format min_unlhd = "\mathit{min}_{\unlhd}"
 %format thin_Q = "\mathit{thin}_{\mathit{Q}}"
 %format `shrink` = "\!\upharpoonright\!"
 
