@@ -20,12 +20,12 @@ variable
 id : ∀ {l} {X : Set l} → X → X
 id x = x
 
--- _∘_ : (Y → Z) → (X → Y) → (X → Z)
--- (f ∘ g) x = f (g x)
-
 _∘_ : {A : Type ℓ₁} {B : Type ℓ₂} {C : Type ℓ₃}
      → (B → C) → (A → B) → (A → C)
 g ∘ f = λ x → g (f x)
+
+_∋_ : {X : Type ℓ} → ℙ X → X → Type ℓ
+A ∋ x = x ∈ A
 
 -- functor
 
@@ -53,9 +53,9 @@ map-compose f g xs = funExt λ z → ⇔toPath
 
 -- monad
 
-_>>=_ : ℙ X → (X → ℙ Y) → ℙ Y
-(_>>=_ {X} {Y} xs f) y =  ∥ Σ X (λ x → fst (xs x) × fst (f x y)) ∥₁ , 
-                          squash₁ -- prop := (prop, f prop)
+_>>=_ : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} → ℙ X → (X → ℙ Y) → ℙ Y
+(_>>=_ {X = X} {Y = Y} xs f) y = ∥ Σ X (λ x → fst (xs x) × fst (f x y)) ∥₁ , squash₁ -- ∥ Σ X (λ x → fst (xs x) × fst (f x y)) ∥₁ , squash₁
+
 
 return : X → ℙ X
 return x x' = ∥ x ≡ x' ∥₁ , squash₁
@@ -92,7 +92,7 @@ ret-left-id x f = funExt λ y → ⇔toPath
 
 infixr 6 _⊑_ _⊒_
 
-_⊑_ : (X → ℙ Y) → (X → ℙ Y) → Set
+_⊑_ : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} → (X → ℙ Y) → (X → ℙ Y) → Type ℓ
 r ⊑ s = ∀ x → r x ⊆ s x
 
 ⊑-refl : {A B : Set} → (r : A → ℙ B) → r ⊑ r
@@ -101,7 +101,7 @@ r ⊑ s = ∀ x → r x ⊆ s x
 ⊑-trans : {r s t : X → ℙ Y} → r ⊑ s → s ⊑ t → r ⊑ t
 ⊑-trans = λ r⊑s s⊑t x y y∈rx → s⊑t x y (r⊑s x y y∈rx)
 
-_⊒_ : (X → ℙ Y) → (X → ℙ Y) → Set
+_⊒_ : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} → (X → ℙ Y) → (X → ℙ Y) → Type ℓ
 r ⊒ s = s ⊑ r
 
 ⊒-trans : {r s t : X → ℙ Y} → r ⊒ s → s ⊒ t → r ⊒ t
@@ -144,10 +144,10 @@ _⊔_ : (X → ℙ Y) → (X → ℙ Y) → (X → ℙ Y)
   
 -- other monadic operators
 
-_=<<_ : (X → ℙ Y) → ℙ X → ℙ Y
+_=<<_ : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} → (X → ℙ Y) → ℙ X → ℙ Y 
 f =<< m = m >>= f
 
-_<=<_ : (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
+_<=<_ : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} {Z : Type ℓ} →  (Y → ℙ Z) → (X → ℙ Y) → (X → ℙ Z)
 (f <=< g) x = f =<< g x
 
 _<$>_ : (X → Y) → ℙ X → ℙ Y
@@ -169,7 +169,7 @@ f <$> m  = m >>= λ x → return (f x)      -- _<$>_ = map
 
   -- converse
 
-_° : (X → ℙ Y) → (Y → ℙ X)
+_° : ∀ {ℓ} {X : Type ℓ} {Y : Type ℓ} → (X → ℙ Y) → (Y → ℙ X)
 (r °) y x = r x y
 
 °-idempotent : (r : X → ℙ Y) → (r °) ° ≡ r
