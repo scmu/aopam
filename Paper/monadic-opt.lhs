@@ -384,7 +384,300 @@ foldR (\x -> min_unlhd . f x) (min_unlhd e) {-"~"-}`sse`{-"~"-} min_unlhd . fold
 } %rm
 \end{theorem}
 
-\section{Proof of the Greedy Theorem}
+\subsection{Example: Segment with Maximum Sum}
+
+
+The function |prefix| non-deterministically computes a prefix of the given list.
+It can be defined inductively:
+\begin{code}
+prefix :: List a -> P (List a)
+prefix []      = return []
+prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~,"-}
+\end{code}
+but we will use a |foldR|-based definition here:
+\begin{spec}
+prefix = foldR pre (return [])
+   where pre x ys = return [] <|> return (x : ys) {-"~~."-}
+\end{spec}
+%if False
+\begin{code}
+pre x ys = return [] <|> return (x : ys)
+\end{code}
+%endif
+Due to the way we define our |foldR|, the second definition returns |[]| more frequently.
+The equivalence of the two definitions of |prefix| depends on
+idempotency of the non-determinism monad.
+
+Conversely, the function |suffix| non-deterministically returns a suffix of the given list:
+\begin{code}
+suffix :: List a -> P (List a)
+suffix []      = return []
+suffix (x:xs)  = return (x:xs) <|> suffix xs {-"~~."-}
+\end{code}
+We get all segments by |prefix <=< suffix|.
+
+Let |max : P (List Int) -> P (List Int)| choose those lists having the largest sum.
+The \emph{maximum segment sum} problem can be defined by:
+\begin{code}
+mss :: List Int -> P (List Int)
+mss = max . (prefix <=< suffix) {-"~~."-}
+\end{code}
+
+We also define a monadic variation of |scanr|:
+\begin{code}
+scanR :: (a -> b -> P b) -> P b -> List a -> P (List b)
+scanR f e []        = wrap <$> e
+scanR f e (x : xs)  = do  ys <- scanR f e xs
+                          z <- f x (head ys)
+                          return (z : ys) {-"~~,"-}
+\end{code}
+where |wrap x = [x]|.
+It is perhaps useful knowing that |scanR| is a |foldR|:
+\begin{spec}
+scanR f e = foldR f' (wrap <$> e)
+  where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
+\end{spec}
+
+\subsubsection{Elementary Properties}
+
+
+The function |max| distributes into |join|:
+%if False
+\begin{code}
+-- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
+propMaxJoin xss = max (join xss) === max (join (fmap max xss))
+\end{code}
+%endif
+\begin{equation}
+  |max (join xss) === max (join (fmap max xss))| \mbox{~~.}
+   \label{eq:MaxJoin}
+\end{equation}
+I hope this property can be proved using more primitive properties.
+
+With \eqref{eq:MaxJoin} we know how |max| promotes into a bind or a Kliesli composition:
+\begin{equation}
+  |max (f <=< g) === max ((max . f) <=< g)| \mbox{~~.}
+   \label{eq:MaxKComp}
+\end{equation}
+The proof goes:
+%if False
+\begin{code}
+-- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
+propMaxBind f g xs =
+\end{code}
+%endif
+\begin{code}
+      max (f =<< g xs)
+ ===    {- definition of |(=<<)| -}
+      max (join (fmap f (g xs)))
+ ===    {- \eqref{eq:MaxJoin} -}
+      max (join (fmap (max . f) (g xs)))
+ ===    {- definition of |(=<<)| -}
+      max ((max . f) =<< g xs) {-"~~."-}
+\end{code}
+
+The function |member| non-deterministically returns an element of the given list.
+Put it in another way, it converts a list to a set:
+\begin{code}
+member :: List a -> P a
+member []        = mzero
+member (x : xs)  = return x <|> member xs {-"~~."-}
+\end{code}
+
+Monadic |max| can be refined to operate on lists
+\begin{equation}
+ |max . member `spse` return . maxlist| \label{eq:MaxMaxList}
+\end{equation}
+where |maxlist| is some implementation of maximum on lists.
+
+\subsubsection{Properties of fold and scan}
+
+
+To begin with, we need the property that:
+%if False
+\begin{code}
+-- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propHeadScanStmt f e xs =
+   head <$> scanR f e xs === foldR f e xs
+\end{code}
+%endif
+\begin{equation}
+  |head <$> scanR f e xs === foldR f e xs| \mbox{~~.} \label{eq:HeadScan}
+\end{equation}
+\begin{proof}
+Induction on |xs|. The case when |xs := []| is immediate.
+For |xs := x:xs| we reason:
+%if False
+\begin{code}
+-- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propHeadScanPfInd f e x xs =
+\end{code}
+%endif
+\begin{code}
+      head <$> scanR f e (x : xs)
+ ===  head <$> do  ys <- scanR f e xs
+                   z <- f x (head ys)
+                   return (z : ys)
+ ===  do  ys <- scanR f e xs
+          z <- f x (head ys)
+          return z
+ ===  do  ys <- scanR f e xs
+          f x (head ys)
+ ===  f x =<< (head <$> scanR f e xs)
+ ===    {- induction -}
+      f x =<< foldR f e xs
+ ===  foldR f e (x : xs) {-"~~."-}
+\end{code}
+\end{proof}
+
+We also need a \emph{scan lemma} for monadic fold and scan:
+%if False
+\begin{code}
+propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propScanLemmaStmt f e =
+   foldR f e <=< suffix === member <=< scanR f e
+\end{code}
+%endif
+\begin{equation}
+  |foldR f e <=< suffix === member <=< scanR f e| \mbox{~~.}
+  \label{eq:ScanLemma}
+\end{equation}
+\begin{proof}
+Induction on the input. For the inductive case we reason:
+%if False
+\begin{code}
+proofScanLemmaInd :: (a -> b -> P b) -> P b -> a -> List a -> P b
+proofScanLemmaInd f e x xs =
+\end{code}
+%endif
+\begin{code}
+      foldR f e =<< suffix (x : xs)
+ ===  foldR f e =<< (return (x:xs) <|> suffix xs)
+ ===    {- |(=<<)| distributes into |(<||>)| -}
+      (foldR f e =<< return (x:xs)) <|> (foldR f e =<< suffix xs)
+ ===    {- induction -}
+      foldR f e (x : xs) <|> (member =<< scanR f e xs)
+ ===  (f x =<< foldR f e xs) <|> (member =<< scanR f e xs)
+ ===    {- \eqref{eq:HeadScan}: |head <$> scanR f e xs === foldR f e xs| -}
+      (f x =<< (head <$> scanR f e xs)) <|> (member =<< scanR f e xs)
+ ===  do  ys <- scanR f e xs
+          f x (head ys) <|> member ys
+ ===    {- check this -}
+      do  ys <- scanR f e xs
+          z <- f x (head ys)
+          return z <|> member ys
+ ===  member =<< scanR f e (x : xs) {-"~~."-}
+\end{code}
+\end{proof}
+
+Fold and scan with deterministic step functions are themselves deterministic:
+\begin{align}
+  |foldR (\x -> return . f x) (return e)| ~&=~ |return . foldr f e| \mbox{~~,}
+    \notag\\
+  |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
+    \label{eq:returnScanR}
+\end{align}
+
+\subsubsection{The Main Derivation}
+
+The main derivation goes:
+%if False
+\begin{code}
+-- derMSSMain :: (a -> b -> P b) -> P b -> a -> List a -> P b
+derMSSMain =
+\end{code}
+%endif
+\begin{code}
+         max . (prefix <=< suffix)
+ ===     max . ((max . prefix) <=< suffix)
+ `spse`      {- greedy theorem -}
+         max . (foldR maxPre (return []) <=< suffix)
+ ===         {- scan lemma \eqref{eq:ScanLemma} -}
+         max . (member <=< scanR maxPre (return []))
+ `spse`      {- |maxPre x `spse` return . zplus x|, by \eqref{eq:returnScanR} -}
+         max . (member <=< (return . scanr zplus []))
+ ===         {- monad law -}
+         max . member . scanr zplus []
+ `spse`      {- \eqref{eq:MaxMaxList} -}
+         return . maxlist . scanr zplus [] {-"~~."-}
+\end{code}
+where |maxPre :: a -> List a -> P (List a)| and
+|zplus :: a -> List a -> List a| are given by:
+\begin{code}
+maxPre  x     = max . pre x {-"~~,"-}
+zplus   x xs  = if x + sum xs < 0 then [] else (x:xs) {-"~~."-}
+\end{code}
+
+\paragraph{Use of Greedy Theorem}
+The greedy theorem helps to establish that
+%if False
+\begin{code}
+-- derMSSMain :: (a -> b -> P b) -> P b -> a -> List a -> P b
+derMSPRes =
+\end{code}
+%endif
+\begin{code}
+  max . prefix `spse` foldR maxPre (return []) {-"~~."-}
+\end{code}
+Recall the greedy theorem:
+%format y0
+%format y1
+%format b0
+%format b1
+\begin{spec}
+min_R . foldr f e `spse` foldr (\x -> min_R . f x) (min_R e)
+   <==  do  (y0, y1) <- any
+            filt R (y0, y1)
+            b1 <- f x y1
+            return (y0, b1)  {-"~~"-}`sse`
+          do  (b1, y0) <- any
+              b0 <- f x y0
+              filt R (b0, b1)
+              return (y0, b1){-"~~."-}
+\end{spec}
+For the MSS problem, the monotonicity condition is proved below:
+%if False
+\begin{code}
+-- derMSSMain :: (a -> b -> P b) -> P b -> a -> List a -> P b
+proofMonoMSS x =
+\end{code}
+%endif
+
+%format ys0
+%format ys1
+%format zs0
+%format zs1
+
+\begin{code}
+        do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            zs1 <- pre x ys1
+            return (ys0, zs1)
+ ===    do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            zs1 <- (return [] <|> return (x : ys1))
+            return (ys0, zs1)
+ ===    do  (ys0, ys1) <- any
+            guard (ys0 `geqs` ys1)
+            return (ys0, []) <|> return (ys0, x : ys1)
+ ===    do  (ys0, ys1) <- any
+            (  do { return (ys0, []) } <|>
+               do { guard (ys0 `geqs` ys1); return (ys0, x : ys1) } )
+ ===      {- |(`geqs`)| monotonic w.r.t |(:)| -}
+        do  (ys0, ys1) <- any
+            (  do { guard ([] `geqs` []); return (ys0, []) } <|>
+               do { guard ((x:ys0) `geqs` (x:ys1)); return (ys0, x : ys1) } )
+ `sse`  do  (ys0, ys1) <- any
+            zs0 <- (return [] <|> return (x:ys0))
+            (  do { guard (zs0 `geqs` []); return (ys0, []) } <|>
+               do { guard (zs0 `geqs` (x:ys1)); return (ys0, x : ys1) } )
+ `sse`  do  (zs1, ys0) <- any
+            zs0 <- (return [] <|> return (x:ys0))
+            guard (zs0 `geqs` zs1)
+            return (ys0, zs1)  {-"~~."-}
+\end{code}
+
+\subsection{Proof of the Greedy Theorem}
 
 
 \begin{proof}
@@ -449,6 +742,169 @@ do  ys <- any
        filt R (b0, b1) {-"~~."-}
 \end{spec}
 The first step can be carried out by |min|-cancelation with |f := id|. The rest is the same.
+
+
+\section{The Thinning Theorem}
+
+
+The function |thin_Q| now has type |T b -> P (T b)|.
+Its universal property is:
+\begin{spec}
+X `sse` thin_Q . collect . S <=>  (mem <=< X) `sse` S &&
+                                  (do  a <- any
+                                       t0 <- X a
+                                       b1 <- S a
+                                       return (t0, b1)) `sse`
+                                    (do  (t0, b1) <- any
+                                         b0 <- mem t0
+                                         filt_Q (b0, b1)
+                                         return (t0, b1)) {-"~~."-}
+\end{spec}
+%if False
+\begin{code}
+propThinUniv :: forall a (b :: Type) . (a -> P (T b)) -> (a -> P b) -> a -> P (T b)
+propThinUniv x s =
+    x `sse` thin_Q . collect . s
+ where pre0 = (mem <=< x) `sse` s
+       pre1 = (do a <- any
+                  t0 <- x a
+                  b1 <- s a
+                  return (t0, b1)) `sse`
+               (do (t0, b1) <- any
+                   b0 <- mem t0
+                   filt_Q (b0, b1)
+                   return (t0, b1))
+\end{code}
+%endif
+Letting |X = thin_Q . collect . S|, we have the cancelation law:
+\begin{spec}
+(do  a <- any
+     t0 <- (thin_Q . collect) (S a)
+     b1 <- S a
+     return (t0, b1)) `sse`
+  (do  (t0, b1) <- any
+       b0 <- mem t0
+       filt_Q (b0, b1)
+       return (t0, b1)) {-"~~."-}
+\end{spec}
+
+The thinning theorem is given by:
+\begin{spec}
+thin_Q . collect . foldR f e `spse` foldR (\x -> thin_Q . collect . (f x <=< mem)) (thin_Q (collect e))
+  <==  do  (y0, y1) <- any
+         b1 <- f x y1
+         filt_Q (y0, y1)
+         return (y0, b1)  {-"~~"-}`sse`
+       do  (b1, y0) <- any
+           b2 <- f x y0
+           filt_Q (b2, b1)
+           return (y0, b1){-"~~."-}
+\end{spec}
+%if False
+\begin{code}
+thmThinning :: (a -> b -> P b) -> P b -> List a -> P (T b)
+thmThinning f e =
+  thin_Q . collect . foldR f e `spse`
+    foldR (\x -> thin_Q . collect . (f x <=< mem))
+       (thin_Q (collect e))
+\end{code}
+%endif
+
+\subsection{Proof of the Thinning Theorem}
+
+\begin{proof}
+By the fixed-point property of |foldR|,
+\begin{spec}
+ (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs `sse`
+    (thin_Q . collect . foldR f e) (x : xs)
+<=>  {- definition of |foldR| -}
+ (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs `sse`
+    thin_Q (collect (f x =<< foldR f e xs))
+<=>  {- abstracting away |xs| -}
+  (thin_Q . collect . (f x <=< mem)) <=< (thin_Q . collect . foldR f e) `sse`
+     thin_Q . collect . (f x <=< foldR f e) {-"~~."-}
+\end{spec}
+%if False
+\begin{code}
+propFixPoint0 :: (a -> b -> P b) -> P b -> a -> List a -> P (T b)
+propFixPoint0 f e x xs =
+  (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs
+  `sse` (thin_Q . collect . foldR f e) (x : xs)
+
+propFixPoint1 :: (a -> b -> P b) -> P b -> a -> List a -> P (T b)
+propFixPoint1 f e x xs =
+  (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs
+  `sse` (thin_Q . collect . foldR f e) (x : xs)
+  `sse` thin_Q (collect (f x =<< foldR f e xs))
+
+propFixPoint2 :: (a -> b -> P b) -> P b -> a -> List a -> P (T b)
+propFixPoint2 f e x  =
+  (thin_Q . collect . (f x <=< mem)) <=< (thin_Q . collect . foldR f e)
+  `sse` thin_Q . collect . (f x <=< foldR f e)
+\end{code}
+%endif
+According to the universal property of |thin_Q|, we only need to show that
+%if False
+\begin{code}
+pfThinThm2 :: (a -> b -> P b) -> P b -> a -> P (T b, b)
+pfThinThm2 f e x =
+\end{code}
+%endif
+\begin{code}
+     do  xs <- any
+         t0 <- (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs
+         b1 <- f x =<< foldR f e xs
+         return (t0, b1)
+===  do  xs <- any
+         u0 <- (thin_Q . collect) (foldR f e xs)
+         t0 <- (thin_Q . collect . (f x <=< mem)) u0
+         y1 <- foldR f e xs
+         b1 <- f x y1
+         return (t0, b1)
+`sse`  {- |thin| cancelation -}
+     do  (u0, y1) <- any
+         y0 <- mem u0
+         t0 <- (thin_Q . collect . (f x <=< mem)) u0
+         filt_Q (y0, y1)
+         b1 <- f x y1
+         return (t0, b1)
+`sse`  {- monotonicity -}
+     do  (u0, b1) <- any
+         y0 <- mem u0
+         b2 <- f x y0
+         filt_Q (b2, b1)
+         t0 <- (thin_Q . collect . (f x <=< mem)) u0
+         return (t0, b1)
+===    {- monad laws -}
+     do  (u0, b1) <- any
+         b2 <- (f x <=< mem) u0
+         t0 <- (thin_Q . collect . (f x <=< mem)) u0
+         filt_Q (b2, b1)
+         return (t0, b1)
+`sse`  {- cancelation -}
+     do  (t0, b2, b1) <- any
+         b0 <- mem t0
+         filt_Q (b0, b2)
+         filt_Q (b2, b1)
+         return (t0, b1)
+`sse`  {- transitivity of |Q| -}
+     do  (t0, b1) <- any
+         b0 <- mem t0
+         filt_Q (b0, b1)
+         return (t0, b1) {-"~~."-}
+\end{code}
+Note that the second "monotonicity" step is not quite the same as the
+monotonicity assumption --- |y0| is not drawn from |any|, but a result of
+|mem u0|. This is fine because
+|do {y0 <- mem u0 ...} | can be rewritten as
+|do {y0' <- mem u0; y0 <- any; filt (=) y0 y0' ... }|.
+\end{proof}
+
+\subsection{Example: Knapsack}
+
+\todo{Or MSS with upper bound on length?}
+
+\section{Conclusions}
 
 \bibliographystyle{jfplike}
 \bibliography{monadic-opt.bib}

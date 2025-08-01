@@ -1,0 +1,39 @@
+\begin{thebibliography}{7}
+
+\bibitem[{Aarts et~al.}(1992){Aarts, Backhouse, Hoogendijk, Voermans, \&
+  van~der Woude}]{Aarts:92:Relational}
+{Aarts, C., Backhouse, R.~C., Hoogendijk, P.~F., Voermans, E. \& van~der Woude,
+  J.} (1992) A relational theory of datatypes. Technical report. Technische
+  Universiteit Eindhoven.
+
+\bibitem[{Backhouse et~al.}(1991){Backhouse, de~Bruin, Malcolm, Voermans, \&
+  van~der Woude}]{BackhousedeBruin:91:Relational}
+{Backhouse, R.~C., de~Bruin, P.~J., Malcolm, G., Voermans, E. \& van~der Woude,
+  J.} (1991) Relational catamorphisms. Proceedings of the {IFIP} {TC}2/{WG}2.1
+  Working Conference on Constructing Programs. Elsevier Science Publishers. pp.
+  287--318.
+
+\bibitem[{Backhouse and Hoogendijk}(1992){Backhouse \&
+  Hoogendijk}]{BackhouseHoogendijk:92:Elements}
+{Backhouse, R.~C. \& Hoogendijk, P.~F.} (1992) Elements of a relational theory
+  of datatypes. Formal Program Development. Proc. {IFIP} {TC}2/{WG} 2.1 State
+  of the Art Seminar. Springer-Verlag. pp. 7--42.
+
+\bibitem[{Bird and de~Moor}(1997){Bird \& de~Moor}]{BirddeMoor:97:Algebra}
+{Bird, R.~S. \& de~Moor, O.} (1997) {\em Algebra of Programming\/}.
+  International Series in Computer Science. Prentice Hall.
+
+\bibitem[{Bird and Gibbons}(2020){Bird \& Gibbons}]{BirdGibbons:20:Algorithm}
+{Bird, R.~S. \& Gibbons, J.} (2020) {\em Algorithm Design with Haskell\/}.
+  Cambridge University Press.
+
+\bibitem[{Bird and Rabe}(2019){Bird \& Rabe}]{BirdRabe:19:How}
+{Bird, R.~S. \& Rabe, F.} (2019) How to calculate with nondeterministic
+  functions. Mathematics of Program Construction. Springer. pp. 138--154.
+
+\bibitem[{de~Moor and Gibbons}(2000){de~Moor \&
+  Gibbons}]{deMoorGibbons:00:Pointwise}
+{de~Moor, O. \& Gibbons, J.} (2000) Pointwise relational programming. Algebraic
+  Methodology and Software Technology. Springer-Verlag. pp. 371--390.
+
+\end{thebibliography}
