@@ -8,7 +8,7 @@ open import Cubical.HITs.PropositionalTruncation as PT
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Cubical.Data.Sigma.Base using (_×_) 
 
-open import Monad
+open import Monad_v2
   
 private
     variable

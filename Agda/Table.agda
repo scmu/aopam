@@ -10,12 +10,13 @@ module Table where
 
 open import Cubical.Foundations.Prelude
 open import Cubical.Foundations.HLevels
-open import Cubical.Data.List.Base
+open import Cubical.Data.List
 open import Cubical.Data.Bool.Base
 open import Cubical.Foundations.Powerset as P using (ℙ; _∈_; _⊆_)
 open import Cubical.HITs.PropositionalTruncation as PT
 open import Cubical.Data.Sigma.Base using (_×_) 
-open import Cubical.Relation.Nullary
+open import Cubical.Data.Empty
+open import Cubical.Data.Sum.Base using (_⊎_)    
 
 private 
   variable
@@ -52,3 +53,36 @@ collect {ℓ} {A} {finA} pa = filter (λ a → hProp2Bool {A = A} (pa a)) (Finit
 -- table T A → set ℙ A
 table2set : ∀ {ℓ} {A : Type ℓ} → T A → ℙ A
 table2set xs = λ a → ∥ (a ∈T xs) ∥₁ , squash₁
+
+concat :  ∀ {ℓ} {A : Type ℓ} → T (T A) → T A
+concat [] = []
+concat (x ∷ xss) = x ++ concat xss
+
+joinT : ∀ {ℓ} {A : Type ℓ} → T (ℙ A) → ℙ A
+joinT {ℓ} {A} [] a = ∥ ⊥* ∥₁ , squash₁
+joinT {ℓ} {A} (px ∷ pxs) a = ∥ (a ∈ px) ⊎ (a ∈ ( joinT pxs)) ∥₁ , squash₁
+
+fmap : ∀ {ℓ} {A B : Type ℓ} → (ℙ A → ℙ B) → T (ℙ A) → T (ℙ B)
+fmap {ℓ} {A} {B} f [] = []
+fmap {ℓ} {A} {B} f (px ∷ pxs) = (f px) ∷ fmap f pxs
+
+
+-- Flatten a finite set of tables into a single table (list concatenation).
+-- Given pta : ℙ (T A), collect enumerates all tables in the set,
+-- producing a list of tables. concat then concatenates these tables
+-- into a single table (list of A).
+flattenTable
+  : ∀ {ℓ} {A : Type ℓ} → {finA : Finite (T A)}
+  → ℙ (T A) → T A
+flattenTable {ℓ} {A} {finA} pta =
+  concat (collect {finA = finA} pta)
+
+
+-- Flatten a set of tables (ℙ (T A)) into a single set of A.
+-- First flatten the tables into a single table (flattenTable),
+-- then convert that table back into a set using table2set.
+flattenSet
+  : ∀ {ℓ} {A : Type ℓ} → {finA : Finite (T A)}
+  → ℙ (T A) → ℙ A
+flattenSet {ℓ} {A} {finA} pta =
+  table2set (flattenTable {finA = finA} pta)
