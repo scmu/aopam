@@ -14,7 +14,8 @@ open import PowersetExt
 
 private
   variable
-    X Y Z : Set
+    ℓ : Level
+    X : Type ℓ
 
 {-
 Defined in Cubical.Foundations.Powerset.
@@ -26,7 +27,7 @@ Defined in Cubical.Foundations.Powerset.
 -}
 
 
-∪-op : {X : Set} → ℙ X → ℙ X → ℙ X
+∪-op : ℙ X → ℙ X → ℙ X
 ∪-op A B x = ∥ (x ∈ A) ⊎ (x ∈ B) ∥₁ , squash₁ -- (x ∈ A ⊎ x ∈ B) ≡  ⟨ A x ⟩ ⊎ ⟨ B x ⟩
 
 infixl 6 _∪_
@@ -35,15 +36,15 @@ _∪_ : ℙ X → ℙ X → ℙ X
 _∪_ = ∪-op
 
 -- Union is commutative
-∪-comm : {X : Set} (A B : ℙ X) → A ∪ B ≡ B ∪ A
-∪-comm {X} A B = P.⊆-extensionality (A ∪ B) (B ∪ A) ((λ x x₁ → rec (snd ((B ∪ A) x)) (helper x A B) x₁) , λ x x₁ → rec (snd ((A ∪ B) x)) (helper x B A) x₁)
+∪-comm : (A B : ℙ X) → A ∪ B ≡ B ∪ A
+∪-comm A B = P.⊆-extensionality (A ∪ B) (B ∪ A) ((λ x x₁ → rec (snd ((B ∪ A) x)) (helper x A B) x₁) , λ x x₁ → rec (snd ((A ∪ B) x)) (helper x B A) x₁)
     where
         helper : (x : X) → (A B : ℙ X) → (x ∈ A) ⊎ (x ∈ B) → (B ∪ A) x .fst
         helper x A B (_⊎_.inl x₁) = ∣ _⊎_.inr x₁ ∣₁
         helper x A B (_⊎_.inr x₁) = ∣ _⊎_.inl x₁ ∣₁
 
 -- Union is associative
-∪-assoc : {X : Set} (A B C : ℙ X) → (A ∪ B) ∪ C ≡ A ∪ (B ∪ C)
+∪-assoc : (A B C : ℙ X) → (A ∪ B) ∪ C ≡ A ∪ (B ∪ C)
 ∪-assoc A B C = P.⊆-extensionality (A ∪ B ∪ C) (A ∪ (B ∪ C)) ((λ x x₁ → rec (snd ((A ∪ (B ∪ C)) x)) (helper x A B C) x₁) , λ x x₁ → rec (snd ((A ∪ B ∪ C) x)) (helper3 x A B C) x₁)
     where
         helper : (x : X) → (A B C : ℙ X) → (x ∈ A ∪ B) ⊎ (x ∈ C) → (A ∪ (B ∪ C)) x .fst
@@ -63,54 +64,52 @@ _∪_ = ∪-op
                 helper4 (_⊎_.inr x) = ∣ _⊎_.inr x ∣₁
 
 -- Subset properties for union
-⊆-∪-left : {X : Set} (A B : ℙ X) → A ⊆ (A ∪ B)
+⊆-∪-left : (A B : ℙ X) → A ⊆ (A ∪ B)
 ⊆-∪-left A B x = inl
 
-⊆-∪-right : {X : Set} (A B : ℙ X) → B ⊆ (A ∪ B)
+⊆-∪-right : (A B : ℙ X) → B ⊆ (A ∪ B)
 ⊆-∪-right A B x = inr
 
 
 
 -- intersection
 
-_∩_ : {X : Set} → ℙ X → ℙ X → ℙ X
+_∩_ : ℙ X → ℙ X → ℙ X
 _∩_ A B x = ((x ∈ A) × (x ∈ B)) , isProp× (P.∈-isProp A x) (P.∈-isProp B x)
 
 -- ∈-∩ : {X : Set} →  (x : X) → (A B : ℙ X) → x ∈ (A ∩ B) ≃ (x ∈ A × x ∈ B)
 -- ∈-∩ = ?
 
-∩-comm : {X : Set} (A B : ℙ X) → A ∩ B ≡ B ∩ A
-∩-comm {X} A B = P.⊆-extensionality (A ∩ B) (B ∩ A) ((λ x z → z .snd , z .fst) , (λ x z → z .snd , z .fst))
+∩-comm : (A B : ℙ X) → A ∩ B ≡ B ∩ A
+∩-comm A B = P.⊆-extensionality (A ∩ B) (B ∩ A) ((λ x z → z .snd , z .fst) , (λ x z → z .snd , z .fst))
 
-∩-assoc :  {X : Set} (A B C : ℙ X) → (A ∩ B) ∩ C ≡ A ∩ (B ∩ C)
-∩-assoc {X} A B C = P.⊆-extensionality ((A ∩ B) ∩ C) (A ∩ (B ∩ C)) ((λ x z → z .fst .fst , (z .fst .snd , z .snd)) , (λ x z → (z .fst , z .snd .fst) , z .snd .snd))
+∩-assoc : (A B C : ℙ X) → (A ∩ B) ∩ C ≡ A ∩ (B ∩ C)
+∩-assoc A B C = P.⊆-extensionality ((A ∩ B) ∩ C) (A ∩ (B ∩ C)) ((λ x z → z .fst .fst , (z .fst .snd , z .snd)) , (λ x z → (z .fst , z .snd .fst) , z .snd .snd))
 
-∩-∪-dist : {X : Set} (A B C : ℙ X) → A ∩ (B ∪ C) ≡ (A ∩ B) ∪ (A ∩ C)
-∩-∪-dist {X} A B C = P.⊆-extensionality (A ∩ (B ∪ C)) ((A ∩ B) ∪ (A ∩ C)) ((λ x x₁ → rec (snd (((A ∩ B) ∪ (A ∩ C))x)) (helper x x₁) (x₁ .snd)) , λ x x₁ → rec (snd ((A ∩ (B ∪ C))x)) (helper2 x) x₁)
-    where 
-        helper : (x : X) → (x ∈ (A ∩ (B ∪ C))) → (x ∈ B) ⊎ (x ∈ C) → ((A ∩ B) ∪ (A ∩ C)) x .fst
-        helper x (fst₁ , snd₁) (_⊎_.inl x₁) = ∣ _⊎_.inl (fst₁ , x₁) ∣₁
-        helper x (fst₁ , snd₁) (_⊎_.inr x₁) = ∣ _⊎_.inr (fst₁ , x₁) ∣₁
+∩-∪-dist-r : (A B C : ℙ X) → (A ∩ (B ∪ C)) ⊆ ((A ∩ B) ∪ (A ∩ C))
+∩-∪-dist-r A B C = λ x x₁ → rec squash₁ (((λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (x₁ .fst , x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr (x₁ .fst , x∈C) ∣₁ }))) (x₁ .snd)
 
-        helper2 : (x : X) → (x ∈ (A ∩ B)) ⊎ (x ∈ (A ∩ C)) → (A ∩ (B ∪ C)) x .fst
-        helper2 x (_⊎_.inl x₁) = x₁ .fst , ∣ _⊎_.inl (x₁ .snd) ∣₁
-        helper2 x (_⊎_.inr x₁) = x₁ .fst , ∣ _⊎_.inr (x₁ .snd) ∣₁
+∩-∪-dist-l : (A B C : ℙ X) → ((A ∩ B) ∪ (A ∩ C)) ⊆ (A ∩ (B ∪ C))
+∩-∪-dist-l A B C = λ x x₁ → rec (P.∈-isProp (A ∩ (B ∪ C)) x) (λ { (_⊎_.inl x∈ab) → x∈ab .fst , ∣ _⊎_.inl (x∈ab .snd) ∣₁ ; (_⊎_.inr x∈ac) → x∈ac .fst , ∣ _⊎_.inr (x∈ac .snd) ∣₁}) x₁
+
+∩-∪-dist : (A B C : ℙ X) → A ∩ (B ∪ C) ≡ (A ∩ B) ∪ (A ∩ C)
+∩-∪-dist A B C = P.⊆-extensionality (A ∩ (B ∪ C)) ((A ∩ B) ∪ (A ∩ C)) (∩-∪-dist-r A B C , ∩-∪-dist-l A B C)
 
 -- todo
--- ∪-∩-dist : {X : Set} → (A B C : ℙ X) → A ∪ (B ∩ C) ≡ (A ∪ B) ∩ (A ∪ C)
--- ∪-∩-dist {X} A B C = P.⊆-extensionality (A ∪ (B ∩ C)) ((A ∪ B) ∩ (A ∪ C)) {!   !}
+-- ∪-∩-dist :(A B C : ℙ X) → A ∪ (B ∩ C) ≡ (A ∪ B) ∩ (A ∪ C)
+-- ∪-∩-dist A B C = P.⊆-extensionality (A ∪ (B ∩ C)) ((A ∪ B) ∩ (A ∪ C)) ({!   !} , {!   !})
 
 
-⊆-∩-left : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆' A
-⊆-∩-left {X} A B = incl (A ∩ B) A (λ x z → z .fst)
+⊆-∩-left : (A B : ℙ X) → (A ∩ B) ⊆' A
+⊆-∩-left A B = incl (A ∩ B) A (λ x z → z .fst)
 
-⊆-∩-right : {X : Set} → (A B : ℙ X) → (A ∩ B) ⊆' B
-⊆-∩-right {X} A B = incl (A ∩ B) B (λ x z → z .snd)
+⊆-∩-right : (A B : ℙ X) → (A ∩ B) ⊆' B
+⊆-∩-right A B = incl (A ∩ B) B (λ x z → z .snd)
 
 
 -- ∪ and ⊆ 
-⊆-∪-monotonic-left : {X : Set} → (A B C : ℙ X) → A ⊆' B → (A ∪ C) ⊆' (B ∪ C)
-⊆-∪-monotonic-left {X} A B C (incl .A .B A⊆B) = incl (A ∪ C) (B ∪ C) (λ x₁ x₂ → rec squash₁ ((λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (A⊆B x₁ x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr x∈C ∣₁ })) x₂)
+⊆-∪-monotonic-left : (A B C : ℙ X) → A ⊆' B → (A ∪ C) ⊆' (B ∪ C)
+⊆-∪-monotonic-left A B C (incl .A .B A⊆B) = incl (A ∪ C) (B ∪ C) (λ x₁ x₂ → rec squash₁ ((λ {(_⊎_.inl x∈A) → ∣ _⊎_.inl (A⊆B x₁ x∈A) ∣₁ ; (_⊎_.inr x∈C) → ∣ _⊎_.inr x∈C ∣₁ })) x₂)
 
-⊆-∪-monotonic-right : {X : Set} → (A B C : ℙ X) → A ⊆' B → (C ∪ A) ⊆' (C ∪ B)
-⊆-∪-monotonic-right {X} A B C (incl .A .B A⊆B) = incl (C ∪ A) (C ∪ B) (λ x₁ x₂ → rec squash₁ (λ { (_⊎_.inl x∈C) → ∣ _⊎_.inl x∈C ∣₁ ; (_⊎_.inr x∈A) → ∣ _⊎_.inr (A⊆B x₁ x∈A) ∣₁ }) x₂)
+⊆-∪-monotonic-right : (A B C : ℙ X) → A ⊆' B → (C ∪ A) ⊆' (C ∪ B)
+⊆-∪-monotonic-right A B C (incl .A .B A⊆B) = incl (C ∪ A) (C ∪ B) (λ x₁ x₂ → rec squash₁ (λ { (_⊎_.inl x∈C) → ∣ _⊎_.inl x∈C ∣₁ ; (_⊎_.inr x∈A) → ∣ _⊎_.inr (A⊆B x₁ x∈A) ∣₁ }) x₂)

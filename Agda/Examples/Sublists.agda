@@ -13,6 +13,10 @@ open import Cubical.Foundations.HLevels
 open import Reasoning
 open import PowersetExt 
 
+private
+  variable
+    X : Type
+
 sublists : List X → ℙ (List X) 
 sublists []       = return []
 sublists (x ∷ xs) = yss ∪ (_∷_ x) <$> yss

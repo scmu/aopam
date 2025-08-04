@@ -17,6 +17,10 @@ open import Sets
 open import Monad
 open import Reasoning
 
+private
+  variable
+    X Y Z : Type
+
 record MinR {Y : Set} (R : Y → ℙ Y) : Set₁ where
   field
     -- The minR function itself

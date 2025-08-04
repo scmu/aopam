@@ -46,8 +46,8 @@ filter : ∀ {ℓ} {A : Type ℓ} → (A → Bool) → List A → List A
 filter p []       = []
 filter p (x ∷ xs) = if p x then x ∷ filter p xs else filter p xs
 
-collect : ∀ {ℓ} {A : Type ℓ} → Finite A → ℙ A → T A
-collect {ℓ} {A} fin pa = filter (λ a → hProp2Bool {A = A} (pa a)) (Finite.enum fin)
+collect : ∀ {ℓ} {A : Type ℓ} → {finA : Finite A} →  ℙ A → T A
+collect {ℓ} {A} {finA} pa = filter (λ a → hProp2Bool {A = A} (pa a)) (Finite.enum finA)
 
 -- table T A → set ℙ A
 table2set : ∀ {ℓ} {A : Type ℓ} → T A → ℙ A
