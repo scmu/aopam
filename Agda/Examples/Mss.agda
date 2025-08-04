@@ -49,7 +49,6 @@ postulate
     max-join :
         {xss : T (ℙ (List ℤ))} → max (joinT  xss) ≡ max (joinT (fmap max xss))
 
-    --     → max (joinT {finA = finA} xss) ≡ max (joinT {finA = finA} (fmap max xss))
 mss : List ℤ → ℙ (List ℤ)
 mss = max ∘ prefix <=< suffix
 
