@@ -147,11 +147,12 @@ A monad consists of a type constructor |M| and operators |return :: a -> M a| an
 & \mbox{{\bf associativity}:}  &|(m >>= f) >>= g| &= |m >>= (\x -> f x >>= g)| \mbox{~~.}
 \end{align*}
 The operator |(>>) :: M a -> M b -> M b|, defined by |m >> n = m >>= (\_ -> n)|, ignores the result of |m| before executing |n|.
-A function |a -> b| can be lifted to monad |M| by the operator |(<$>)|:
+A function |a -> b| can be lifted to monad |M| by |fmap|:
 \begin{spec}
-(<$>) :: (a -> b) -> M a -> M b
-f <$> m = m >>= (return . f) {-"~~."-}
+fmap :: (a -> b) -> M a -> M b
+fmap f m = m >>= (return . f) {-"~~."-}
 \end{spec}
+We also write |fmap f m| infix as |f <$> m|.
 It follows easily from the monad laws that
 |id <$> m = m| and |(f . g) <$> m = f <$> (g <$> m)|, that is, |M| is a functor with |(<$>)| as its functorial map.
 
@@ -162,6 +163,15 @@ f =<< m = m >>= f {-"~~,"-}
 
 (<=<) :: (b -> M c) -> (a -> M b) -> (a -> M c)
 (f <=< g) x = f =<< g x {-"~~."-}
+\end{spec}
+
+Alternatively, a monad can be defined by three operators: |return :: a -> M a|, |join :: M (M a) -> M a|, and its functorial map |(<$>) :: (a -> b) -> M a -> M b|. The two styles of definitions are equivalent, as |(>>=)| can be defined in terms of |join| and |(<$>)|, and vice versa:
+\begin{spec}
+join :: M (M a) -> M a
+join m = m >>= id {-"~~,"-}
+
+(>>=) :: M a -> (a -> M b) -> M b
+m >>= f = join (f <$> m) {-"~~."-}
 \end{spec}
 
 Non-determinism is the only effect we are concerned with in this article: |M a| denotes a nondeterministic computation that may yield zero, one, or more values of type |a|.
@@ -184,7 +194,7 @@ We also lift the relation to functions: |f `sse` g = (forall x : f x `sse` g x)|
 
 A structure that supports all the operations above is the set monad: for all type |a|,
 |m :: P a| is a set whose elements are of type |a|,
-|mzero| is the empty set, |mplus| is set union, |(`sse`)| is set inclusion, |return| forms a singleton set, and |m >>= f| is given by |union {f x || x <- m }|.
+|mzero| is the empty set, |mplus| is set union for two sets, |join| is union for a set of sets, |(`sse`)| is set inclusion, |return| forms a singleton set, and |m >>= f| is given by |join {f x || x <- m }|.
 For the rest of the paper we take |M = P|.
 
 The set |any : P a| contains all elements having type |a|.
@@ -194,7 +204,8 @@ The command |filt : (a -> Bool) -> a -> P a| is defined by
 filt p x  | p x        = return x
           | otherwise  = fail {-"~~."-}
 \end{spec}
-It returns its input |x| if it satisfies |p|, and fails otherwise.
+It returns its input |x| if it satisfies |p|, and fails otherwise.%
+\footnote{Conventionally there is a function |guard :: Bool -> M ()| that returns |()| when the input is true, and |filt p x| is defined by |do { guard (p x); return x }|. In this paper we try to introduce less construct and use only |filt|.}
 
 \subsection{An Agda Model of Set Monad}
 
@@ -251,15 +262,17 @@ One may then prove the following |foldR| fusion rule:
 %format e0
 %format e1
 With \eqref{eq:foldR-comp} it is easy to show that |foldR| is monotonic:
-\begin{equation*}
+\begin{equation}
 |foldR f0 e0 `sse` foldR f1 e1 {-"~"-}<=={-"~"-} f0 `sse` f1 && e0 `sse` e1  {-"~~."-}|
-\end{equation*}
+\label{eq:foldR-monotonicity}
+\end{equation}
 Note that in |f0 `sse` f1|, set inclusion is lifted to denote |f0 x y `sse` f1 x y| for all |x| and |y|.
 
 Finally, monadic |foldR| can be refined to pure |foldr| if both of its arguments are pure:
-\begin{equation*}
+\begin{equation}
 |return (foldr f e) = foldR (\x -> return . f x) (return e) {-"~~."-}|
-\end{equation*}
+\label{eq:foldr-foldR}
+\end{equation}
 
 \subsection{Minimum}
 
@@ -344,6 +357,67 @@ By defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; retur
 We may then manipulate expressions using properties of the |split| operator.
 The |min|-cancelation law is written as
 |split (min_unlhd . f) f =<< any {-"\,"-}`sse`{-"\,"-} filt unlhd =<< any|.
+
+Maximum is defined as the dual of minimum:
+\begin{spec}
+  max_unlhd = min_unrhd {-"~~."-}
+\end{spec}
+
+\paragraph*{Promotion into Kliseli Composition.}~
+The function |min| promotes into |join|:
+%if False
+\begin{code}
+-- propMinJoin :: forall {k} (a :: Type). P (P a) -> P a
+propMinJoin xss = min (join xss) === min (join (fmap min xss))
+\end{code}
+%endif
+\begin{equation}
+  |min . join === min . join  . fmap min| \mbox{~~.}
+   \label{eq:MinJoin}
+\end{equation}
+Consider an input |xss :: P (P a)|, a set of sets, as the input for both sides. On the lefthand side, |xss| is joined into a single set, from which we keep the minimums. It is equivalent to the righthand side, where we choose the minimums of each of the sets in |xss|, before keeping their minimums.
+With \eqref{eq:MinJoin} and the definition of |(>>=)| by |join| we can show how |min| promotes into |(=<<)| or |(<=<)|:
+\begin{equation}
+  |min (f <=< g) === min ((min . f) <=< g)| \mbox{~~.}
+   \label{eq:MinKComp}
+\end{equation}
+%The proof goes:
+%%if False
+%\begin{code}
+%-- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
+%propMaxBind f g xs =
+%\end{code}
+%%endif
+%\begin{code}
+%      max (f =<< g xs)
+% ===    {- definition of |(=<<)| -}
+%      max (join (fmap f (g xs)))
+% ===    {- \eqref{eq:MaxJoin} -}
+%      max (join (fmap (max . f) (g xs)))
+% ===    {- definition of |(=<<)| -}
+%      max ((max . f) =<< g xs) {-"~~."-}
+%\end{code}
+
+\paragraph*{Conversion from Lists.}~
+The function |member| non-deterministically returns an element of the given list.
+Put it in another way, it converts a list to a set:
+\begin{code}
+member :: List a -> P a
+member []        = mzero
+member (x : xs)  = return x <|> member xs {-"~~."-}
+\end{code}
+
+Monadic |min| can be refined to operate on lists
+\begin{equation}
+ |return . minlist_unlhd`sse` min_unlhd . member | \label{eq:MaxMaxList}
+\end{equation}
+where |minlist| is some implementation of minimum on lists, e.g.
+\begin{spec}
+  minlist :: List a -> a
+  minlist [x] = x
+  minlist (x : y : xs) = x `bmin` minlist (y : ys) {-"~~,"-}
+   where x `bmin` y  =if x `unlhd` y then x else y {-"~~."-}
+\end{spec}
 
 \paragraph*{In the Agda Model}
 we implement |min| by:
@@ -437,58 +511,6 @@ It is perhaps useful knowing that |scanR| is a |foldR|:
 scanR f e = foldR f' (wrap <$> e)
   where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
 \end{spec}
-
-\subsubsection{Elementary Properties}
-
-
-The function |max| distributes into |join|:
-%if False
-\begin{code}
--- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
-propMaxJoin xss = max (join xss) === max (join (fmap max xss))
-\end{code}
-%endif
-\begin{equation}
-  |max (join xss) === max (join (fmap max xss))| \mbox{~~.}
-   \label{eq:MaxJoin}
-\end{equation}
-I hope this property can be proved using more primitive properties.
-
-With \eqref{eq:MaxJoin} we know how |max| promotes into a bind or a Kliesli composition:
-\begin{equation}
-  |max (f <=< g) === max ((max . f) <=< g)| \mbox{~~.}
-   \label{eq:MaxKComp}
-\end{equation}
-The proof goes:
-%if False
-\begin{code}
--- propMaxJoin :: forall {k} (a :: Type). P (P a) -> P a
-propMaxBind f g xs =
-\end{code}
-%endif
-\begin{code}
-      max (f =<< g xs)
- ===    {- definition of |(=<<)| -}
-      max (join (fmap f (g xs)))
- ===    {- \eqref{eq:MaxJoin} -}
-      max (join (fmap (max . f) (g xs)))
- ===    {- definition of |(=<<)| -}
-      max ((max . f) =<< g xs) {-"~~."-}
-\end{code}
-
-The function |member| non-deterministically returns an element of the given list.
-Put it in another way, it converts a list to a set:
-\begin{code}
-member :: List a -> P a
-member []        = mzero
-member (x : xs)  = return x <|> member xs {-"~~."-}
-\end{code}
-
-Monadic |max| can be refined to operate on lists
-\begin{equation}
- |max . member `spse` return . maxlist| \label{eq:MaxMaxList}
-\end{equation}
-where |maxlist| is some implementation of maximum on lists.
 
 \subsubsection{Properties of fold and scan}
 
