@@ -1,6 +1,7 @@
 %format min_R = "\mathit{min}_{\mathit{R}}"
 %format min_unlhd = "\mathit{min}_{\unlhd}"
 %format minlist_unlhd = "\mathit{minlist}_{\unlhd}"
+%format maxlist_unlhd = "\mathit{maxlist}_{\unlhd}"
 %format max_unlhd = "\mathit{max}_{\unlhd}"
 %format min_unrhd = "\mathit{min}_{\unrhd}"
 %format thin_Q = "\mathit{thin}_{\mathit{Q}}"
@@ -50,7 +51,11 @@
 
 %format unlhd = "(\unlhd)"
 %format `unlhd` = "\unlhd"
+%format unrhd = "(\unrhd)"
+%format `unrhd` = "\unrhd"
 %format lhd = "(\lhd)"
 %format `lhd` = "\lhd"
+%format rhd = "(\rhd)"
+%format `rhd` = "\rhd"
 
 %format Sum = "\Sigma"
