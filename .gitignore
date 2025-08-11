@@ -18,3 +18,4 @@ Notes/thinning.pdf
 *.blg
 
 Paper/monadic-opt.pdf
+.DS_Store
