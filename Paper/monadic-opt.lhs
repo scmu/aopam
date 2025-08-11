@@ -364,7 +364,7 @@ Letting |h = max . f| in \eqref{eq:max-univ-monadic}, we get the |max|-cancelati
  |do|~ & |(y1, y0) <- any| \\
        & |filt unrhd (y1, y0)| \mbox{~~.}
  \end{aligned}
- \label{eq:min-cancelation}
+ \label{eq:max-cancelation}
 \end{equation}
 
 By defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; return (y,z) }|,
@@ -493,9 +493,10 @@ This is formalised by the following Greedy Theorem:
 Let |unlhd| be a binary relation on |b| that is reflexive and transitive.
 and let |f :: a -> b -> P b| and |e :: P b|.
 If |f x| is monotonic on |unrhd| for all |x|, we have
-\begin{spec}
-foldR (\x -> max_unlhd . f x) (max_unlhd e) {-"~"-}`sse`{-"~"-} max_unlhd . foldR f e {-"~~."-}
-\end{spec}
+\begin{equation}
+|foldR (\x -> max_unlhd . f x) (max_unlhd e) {-"~"-}`sse`{-"~"-} max_unlhd . foldR f e {-"~~."-}|
+\label{eq:greedy}
+\end{equation}
 } %rm
 \end{theorem}
 
@@ -507,51 +508,125 @@ To most users, what matters is how the Greedy Theorem can be put to use to solve
 But, having introduced something as awkward as \eqref{eq:monotonicity}, we would like to see how it helps to prove the theorem. It will turn out that \eqref{eq:monotonicity} fits quite well into the proof of Theorem \ref{thm:greedy}.
 
 \begin{proof}
-The aim is to prove that |foldR (\x -> min_unlhd . f x) (min_unlhd e) {-"~"-}`sse`{-"~"-} min_unlhd . foldR f e| if the monotonicity condition holds.
+The aim is to prove \eqref{eq:greedy} given that the monotonicity condition holds.
+There are various ways one can proceed.
+We may apply both sides of \eqref{eq:greedy} to a list, and go with a usual inductive proof.
+To go for the most concise proof one may use the |foldR| fusion theorem.
+We will go for something in the middle: using the fixed-point property \eqref{eq:foldR-comp}. This way we do not get the shortest proof, but we get to demonstrate more tricks that may be useful in reasoning about monadic programs.
 
-By the  fixed-point property \eqref{eq:foldR-comp}, we ought to prove
+By the fixed-point property \eqref{eq:foldR-comp}, to establish \eqref{eq:greedy} we ought to prove that
 \begin{spec}
-  (min_unlhd . f x) =<< min_unlhd (foldr f e xs) `sse`
-    (min_unlhd . f x) =<< min_unlhd (foldR f e (x : xs)) {-"~~."-}
+  max e `sse` max (foldR f e []) &&
+  (max . f x) =<< max (foldR f e xs) `sse` max (foldR f e (x : xs)) {-"~~."-}
 \end{spec}
+The first inclusion is immediate. The second expands to
 \begin{spec}
-     min_R . (f x <=< foldr f e) `spse`  (min_R . f x) <=< (min_R . foldr f e) {-"~~."-}
+  (max . f x) =<< max (foldR f e xs) `sse` max (f x =<< foldR f e xs) {-"~~."-}
 \end{spec}
-Now we use the universal property. We focus on the second clause.
-We use |do|-notation to implicitly invoke the monad laws, and commutative laws, behind-the-scene.
+Abstracting |xs| away, we get
 \begin{spec}
-       do  xs <- any
-           b0 <- (min_R . f x) =<< min_R (foldr f e xs)
-           b1 <- f x =<< foldr f e xs
-           return (b0, b1)
-=      do  xs <- any
-           y0 <- min_R (foldr f e xs)
-           b0 <- min_R (f x y0)
-           y1 <- foldr f e xs
-           b1 <- f x y1
-           return (b0, b1)
-`sse`   {- |min|-cancelation -}
-       do  (y0, y1) <- any
-           filt R (y0, y1)
-           b0 <- min_R (f x y0)
-           b1 <- f x y1
-           return (b0, b1)
+ (max . f x) <=< (max . foldR f e) `sse` max . (f x <=< foldR f e)    {-"~~,"-}
+\end{spec}
+which matches the form of the universal property \eqref{eq:max-univ-monadic} with |h := (max . f x) <=< (max . foldR f e)| and |f := f x <=< foldR f e|.
+The first conjunct in the righthand side of \eqref{eq:max-univ-monadic}, that
+|(max . f x) <=< (max . foldR f e) `sse` f x <=< foldR f e|
+follows from that |max `sse` id|.
+For the second conjunct, we need to prove that:
+\begin{equation*}
+\setlength{\jot}{-1pt}
+ \begin{aligned}
+ |do|~ & |xs <- any| \\
+       & |y1 <- (max . f x) =<< max (foldR f e xs)| \\
+       & |y0 <- f x =<< foldR f e xs| \\
+       & |return (y1, y0)|
+ \end{aligned}
+ |`sse`|~~
+ \begin{aligned}
+ |do|~ & |(y1, y0) <- any| \\
+       & |filt unrhd (y1, y0)|
+ \end{aligned}\mbox{~~.}
+\end{equation*}
+It is usually easier to start from the smaller side (the lefthand side) and stepwise relaxing to to a larger monad. Using associative of |(=<<)| and definition of |do|-notation, the lefthand side expands to:
+\begin{spec}
+do  xs <- any
+    b1 <- max (foldR f e xs)
+    y1 <- max (f x b1)
+    b0 <- foldR f e xs
+    y0 <- f x b0
+    return (y1, y0) {-"~~."-}
+\end{spec}
+Having both |max (foldR f e xs)| and |foldR f e xs| inspires us to use the |max|-cancelation law.
+To use the law, notice that lines generating |xs|, |b1|, and |b0| match that of the lefthand side of \eqref{eq:max-cancelation}, therefore we rewrite them accordingly to the righthand side:
+\begin{spec}
+       ...
+`sse`   {- |max|-cancelation -}
+       do  (b1, b0) <- any
+           filt unrhd (b1, b0)
+           y1 <- max (f x b1)
+           y0 <- f x b0
+           return (y1, y0) {-"~~."-}
+\end{spec}
+If we were calling |f x b1| instead of |f x b0|, we would be able to use |max|-cancelation again.
+That is exactly what monotonicity offers us: it assures that, instead of applying |f x| to |b0|, we lose nothing by applying |f x| to the preferred solution |b1|.
+To make use of monotonicity, notice that the lines generating |(b1, b0)| and |y0| and the |filt unrhd (b1, b0)| match the lefthand side of \eqref{eq:monotonicity}, therefore we rewrite them to the righthand side of \eqref{eq:monotonicity}:
+\begin{spec}
+       ...
 `sse`   {- monotonicity -}
        do  (b1, y0) <- any
-           b2 <- f x y0
-           filt R (b2, b1)
-           b0 <- min_R (f x y0)
-           return (b0, b1)
-`sse`   {- |min|-cancelation -}
-       do  (b0, b1, b2) <- any
-           filt R (b0, b2)
-           filt R (b2, b1)
-           return (b0, b1)
-`sse`   {- |R| transitive -}
-       do  (b0, b1) <- any
-           filt R (b0, b1) {-"~~."-}
+           z1 <- f x b1
+           filt unrhd (z1, y0)
+           y1 <- max (f x b1)
+           return (y1, y0) {-"~~."-}
 \end{spec}
+Now we can use |max|-cancelation again to cancel |max (f x b1)| and |f x b1|:
+\begin{spec}
+       ...
+`sse`   {- |max|-cancelation -}
+       do  (y1, y0, z1) <- any
+           filt unrhd (y1, z1)
+           filt unrhd (z1, y0)
+           return (y1, y0)
+`sse`   {- |unrhd| transitive -}
+       do  (y1, y0) <- any
+           filt unrhd (y1, y0) {-"~~."-}
+\end{spec}
+The last step uses transitivity of |unrhd|, and then we are done.
+
+% \begin{spec}
+%        do  xs <- any
+%            y1 <- (max . f x) =<< max (foldR f e xs)
+%            y0 <- f x =<< foldR f e xs
+%            return (y1, y0)
+% =        {- monad-laws, |do|-notation -}
+%        do  xs <- any
+%            b1 <- max (foldR f e xs)
+%            y1 <- max (f x b1)
+%            b0 <- foldR f e xs
+%            y0 <- f x b0
+%            return (y1, y0)
+% `sse`   {- |max|-cancelation -}
+%        do  (b1, b0) <- any
+%            filt unrhd (b1, b0)
+%            y1 <- max (f x b1)
+%            y0 <- f x b0
+%            return (y1, y0)
+% `sse`   {- monotonicity -}
+%        do  (b1, y0) <- any
+%            z1 <- f x b1
+%            filt unrhd (z1, y0)
+%            y1 <- max (f x b1)
+%            return (y1, y0)
+% `sse`   {- |max|-cancelation -}
+%        do  (y1, y0, z1) <- any
+%            filt unrhd (y1, z1)
+%            filt unrhd (z1, y0)
+%            return (y1, y0)
+% `sse`   {- |unrhd| transitive -}
+%        do  (y1, y0) <- any
+%            filt unrhd (y1, y0) {-"~~."-}
+% \end{spec}
 \end{proof}
+We use |do|-notation to implicitly invoke the monad laws, and commutative laws, behind-the-scene.
 
 We have chosen to use the fixed-point property for the proof, to demonstrate more steps. We could have also used the fusion-theorem instead.
 Recall the fusion condition:
