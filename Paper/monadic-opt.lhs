@@ -50,11 +50,17 @@ infixr 0 ===
 
 %format b0
 %format b1
+%format b1'
 %format y0
 %format y1
+%format y2
 %format z0
 %format z1
 %format z2
+%format t0
+%format t1
+%format u0
+%format u1
 %format Set1
 
 
@@ -646,15 +652,20 @@ The first step can be carried out by |min|-cancelation with |f := id|. The rest 
 
 \subsection{Example: Segment with Maximum Sum}
 
+To see an application of the Greedy Theorem, we consider the classical maximum segment sum again,
+but return the list instead of the sum.
+The reason for reviewing an old problem is to see whether our usual pattern of problem solving:
+factor segment problems into prefix-of-suffix problems, using ``scan'', etc,
+adapt smoothly into our new setting.
 
-The function |prefix| non-deterministically computes a prefix of the given list.
-It can be defined inductively:
+Typically, to solve a problem on segments, we see it as solving a problem on prefixes for each of the suffixes of the input.
+The function |prefix| non-deterministically computes a prefix of the given list:
 \begin{code}
 prefix :: List a -> P (List a)
 prefix []      = return []
-prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~,"-}
+prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~."-}
 \end{code}
-but we will use a |foldR|-based definition here:
+Instead of the inductive definition above, we will use a |foldR|-based definition here:
 \begin{spec}
 prefix = foldR pre (return [])
    where pre x ys = return [] <|> return (x : ys) {-"~~."-}
@@ -676,14 +687,19 @@ suffix (x:xs)  = return (x:xs) <|> suffix xs {-"~~."-}
 \end{code}
 We get all segments by |prefix <=< suffix|.
 
-Let |max : P (List Int) -> P (List Int)| choose those lists having the largest sum.
+Let |geqs| be defined by |xs `geqs` ys = sum xs >= sum ys|, therefore
+|max_leqs : P (List Int) -> P (List Int)| choose those lists having the largest sum.
 The \emph{maximum segment sum} problem can be defined by:
 \begin{code}
 mss :: List Int -> P (List Int)
-mss = max . (prefix <=< suffix) {-"~~."-}
+mss = max_leqs . (prefix <=< suffix) {-"~~."-}
 \end{code}
 
-We also define a monadic variation of |scanr|:
+
+\subsubsection{Scan and Its Properties}
+
+A key step in speeding up the algorithm to |mss| is introducing |scanr|.
+For this article, we define a monadic variation of |scanr|:
 \begin{code}
 scanR :: (a -> b -> P b) -> P b -> List a -> P (List b)
 scanR f e []        = wrap <$> e
@@ -698,10 +714,8 @@ scanR f e = foldR f' (wrap <$> e)
   where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
 \end{spec}
 
-\subsubsection{Properties of fold and scan}
-
-
-To begin with, we need the property that:
+We will need a number of properties relating scan and fold.
+To begin with:
 %if False
 \begin{code}
 -- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
@@ -723,18 +737,23 @@ propHeadScanPfInd f e x xs =
 %endif
 \begin{code}
       head <$> scanR f e (x : xs)
- ===  head <$> do  ys <- scanR f e xs
+ ===    {- definition of |scanR| -}
+      head <$> do  ys <- scanR f e xs
                    z <- f x (head ys)
                    return (z : ys)
- ===  do  ys <- scanR f e xs
+ ===    {- definition of |(<$>)|, monad laws -}
+      do  ys <- scanR f e xs
           z <- f x (head ys)
           return z
- ===  do  ys <- scanR f e xs
+ ===    {- monad law -}
+      do  ys <- scanR f e xs
           f x (head ys)
- ===  f x =<< (head <$> scanR f e xs)
+ ===    {- |do|-notation -}
+      f x =<< (head <$> scanR f e xs)
  ===    {- induction -}
       f x =<< foldR f e xs
- ===  foldR f e (x : xs) {-"~~."-}
+ ===    {- definition of |foldR| -}
+      foldR f e (x : xs) {-"~~."-}
 \end{code}
 \end{proof}
 
@@ -774,16 +793,16 @@ proofScanLemmaInd f e x xs =
       do  ys <- scanR f e xs
           z <- f x (head ys)
           return z <|> member ys
- ===  member =<< scanR f e (x : xs) {-"~~."-}
+ ===    {- definitions of |scanR| and |member| -}
+      member =<< scanR f e (x : xs) {-"~~."-}
 \end{code}
 \end{proof}
 
-Fold and scan with deterministic step functions are themselves deterministic:
+Finally, from \eqref{eq:foldr-foldR} one can induce that |scarnR| with a
+deterministic step function is itself deterministic:
 \begin{align}
-  |foldR (\x -> return . f x) (return e)| ~&=~ |return . foldr f e| \mbox{~~,}
-    \notag\\
   |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
-    \label{eq:returnScanR}
+    \label{eq:scanr-scanR}
 \end{align}
 
 \subsubsection{The Main Derivation}
@@ -802,7 +821,7 @@ derMSSMain =
          max . (foldR maxPre (return []) <=< suffix)
  ===         {- scan lemma \eqref{eq:ScanLemma} -}
          max . (member <=< scanR maxPre (return []))
- `spse`      {- |maxPre x `spse` return . zplus x|, by \eqref{eq:returnScanR} -}
+ `spse`      {- |maxPre x `spse` return . zplus x|, by \eqref{eq:scanr-scanR} -}
          max . (member <=< (return . scanr zplus []))
  ===         {- monad law -}
          max . member . scanr zplus []
@@ -816,7 +835,7 @@ maxPre  x     = max . pre x {-"~~,"-}
 zplus   x xs  = if x + sum xs < 0 then [] else (x:xs) {-"~~."-}
 \end{code}
 
-\paragraph{Use of Greedy Theorem}
+\paragraph*{Use of Greedy Theorem}
 The greedy theorem helps to establish that
 %if False
 \begin{code}
@@ -827,22 +846,22 @@ derMSPRes =
 \begin{code}
   max . prefix `spse` foldR maxPre (return []) {-"~~."-}
 \end{code}
-Recall the greedy theorem:
-%format y0
-%format y1
-%format b0
-%format b1
-\begin{spec}
-min_R . foldr f e `spse` foldr (\x -> min_R . f x) (min_R e)
-   <==  do  (y0, y1) <- any
-            filt R (y0, y1)
-            b1 <- f x y1
-            return (y0, b1)  {-"~~"-}`sse`
-          do  (b1, y0) <- any
-              b0 <- f x y0
-              filt R (b0, b1)
-              return (y0, b1){-"~~."-}
-\end{spec}
+% Recall the greedy theorem:
+% %format y0
+% %format y1
+% %format b0
+% %format b1
+% \begin{spec}
+% min_R . foldr f e `spse` foldr (\x -> min_R . f x) (min_R e)
+%    <==  do  (y0, y1) <- any
+%             filt R (y0, y1)
+%             b1 <- f x y1
+%             return (y0, b1)  {-"~~"-}`sse`
+%           do  (b1, y0) <- any
+%               b0 <- f x y0
+%               filt R (b0, b1)
+%               return (y0, b1){-"~~."-}
+% \end{spec}
 For the MSS problem, the monotonicity condition is proved below:
 %if False
 \begin{code}
@@ -857,50 +876,65 @@ proofMonoMSS x =
 %format zs1
 
 \begin{code}
-        do  (ys0, ys1) <- any
-            guard (ys0 `geqs` ys1)
-            zs1 <- pre x ys1
-            return (ys0, zs1)
- ===    do  (ys0, ys1) <- any
-            guard (ys0 `geqs` ys1)
-            zs1 <- (return [] <|> return (x : ys1))
-            return (ys0, zs1)
- ===    do  (ys0, ys1) <- any
-            guard (ys0 `geqs` ys1)
-            return (ys0, []) <|> return (ys0, x : ys1)
- ===    do  (ys0, ys1) <- any
-            (  do { return (ys0, []) } <|>
-               do { guard (ys0 `geqs` ys1); return (ys0, x : ys1) } )
- ===      {- |(`geqs`)| monotonic w.r.t |(:)| -}
-        do  (ys0, ys1) <- any
-            (  do { guard ([] `geqs` []); return (ys0, []) } <|>
-               do { guard ((x:ys0) `geqs` (x:ys1)); return (ys0, x : ys1) } )
- `sse`  do  (ys0, ys1) <- any
-            zs0 <- (return [] <|> return (x:ys0))
-            (  do { guard (zs0 `geqs` []); return (ys0, []) } <|>
-               do { guard (zs0 `geqs` (x:ys1)); return (ys0, x : ys1) } )
- `sse`  do  (zs1, ys0) <- any
-            zs0 <- (return [] <|> return (x:ys0))
-            guard (zs0 `geqs` zs1)
-            return (ys0, zs1)  {-"~~."-}
+        do  (ys1, ys0) <- any
+            filt geqs (ys1, ys0)
+            zs0 <- pre x ys0
+            return (ys1, zs0)
+ ===       {- definition of |pre| -}
+        do  (ys1, ys0) <- any
+            filt geqs (ys1, ys0)
+            zs0 <- (return [] <|> return (x : ys0))
+            return (ys1, zs0)
+ ===       {- monad laws -}
+        do  (ys1, ys0) <- any
+            filt geqs (ys1, ys0)
+            return (ys1, []) <|> return (ys1, x : ys0)
+ ===       {- |(>>=)| distributes into |(<||>)|, since |ys1 `geqs` []| -}
+        do  (ys1, ys0) <- any
+            (  do { return (ys1, []) } <|>
+               do { filt geqs (ys1, ys0); return (ys1, x : ys0) } )
+ ===       {- |geqs| monotonic w.r.t |(:)| -}
+        do  (ys1, ys0) <- any
+            (  do { filt geqs ([], []); return (ys1, []) } <|>
+               do { filt geqs (x:ys1, x:ys0); return (ys1, x : ys0) } )
+ `sse`  do  (ys1, ys0) <- any
+            zs1 <- (return [] <|> return (x:ys1))
+            (  do { filt geqs (zs1, []); return (ys1, []) } <|>
+               do { filt geqs (zs1, x:ys0); return (ys1, x : ys0) } )
+ `sse`  do  (ys1, zs0) <- any
+            zs1 <- (return [] <|> return (x:ys1))
+            filt geqs (zs1, zs0)
+            return (ys1, zs0)  {-"~~."-}
 \end{code}
 
 \section{The Thinning Theorem}
 
 
-The function |thin_Q| now has type |T b -> P (T b)|.
+The function |thin_preceq| now has type |T b -> P (T b)|.
 Its universal property is:
-\begin{spec}
-X `sse` thin_Q . collect . S <=>  (mem <=< X) `sse` S &&
-                                  (do  a <- any
-                                       t0 <- X a
-                                       b1 <- S a
-                                       return (t0, b1)) `sse`
-                                    (do  (t0, b1) <- any
-                                         b0 <- mem t0
-                                         filt_Q (b0, b1)
-                                         return (t0, b1)) {-"~~."-}
-\end{spec}
+\begin{equation}
+\setlength{\jot}{-1pt}
+\begin{split}
+|h `sse` thin_preceq . collect . f |\mbox{~~}|<==>|&\mbox{~~} |(mem <=< h) `sse` f &&|\\
+&
+\left(
+ \begin{aligned}
+ |do|~ & |x <- any| \\
+       & |t1 <- h x| \\
+       & |y0 <- f x| \\
+       & |return (t1, y0)|
+ \end{aligned}
+ |`sse`|~~
+ \begin{aligned}
+ |do|~ & |(t1, y0) <- any| \\
+       & |y1 <- mem t1| \\
+       & |filt succeq (y1, y0)|\\
+       & |return (t1, y0)|
+ \end{aligned}
+ \right)\mbox{~~.}
+ \label{eq:thin-univ-monadic}
+\end{split}
+\end{equation}
 %if False
 \begin{code}
 propThinUniv :: forall a (b :: Type) . (a -> P (T b)) -> (a -> P b) -> a -> P (T b)
@@ -917,53 +951,64 @@ propThinUniv x s =
                    return (t0, b1))
 \end{code}
 %endif
-Letting |X = thin_Q . collect . S|, we have the cancelation law:
-\begin{spec}
-(do  a <- any
-     t0 <- (thin_Q . collect) (S a)
-     b1 <- S a
-     return (t0, b1)) `sse`
-  (do  (t0, b1) <- any
-       b0 <- mem t0
-       filt_Q (b0, b1)
-       return (t0, b1)) {-"~~."-}
-\end{spec}
+Letting |h = thin_preceq . collect . f|, we have the cancelation law:
+\begin{equation}
+\setlength{\jot}{-1pt}
+  \begin{aligned}
+  |do|~ & |x <- any| \\
+        & |t1 <- thin_preceq (collect (f x))| \\
+        & |y0 <- f x| \\
+        & |return (t1, y0)|
+  \end{aligned}
+  |`sse`|~~
+  \begin{aligned}
+  |do|~ & |(t1, y0) <- any| \\
+        & |y1 <- mem t1| \\
+        & |filt succeq (y1, y0)|\\
+        & |return (t1, y0)|
+  \end{aligned}
+\end{equation}
+
 
 The thinning theorem is given by:
-\begin{spec}
-thin_Q . collect . foldR f e `spse` foldR (\x -> thin_Q . collect . (f x <=< mem)) (thin_Q (collect e))
-  <==  do  (y0, y1) <- any
-         b1 <- f x y1
-         filt_Q (y0, y1)
-         return (y0, b1)  {-"~~"-}`sse`
-       do  (b1, y0) <- any
-           b2 <- f x y0
-           filt_Q (b2, b1)
-           return (y0, b1){-"~~."-}
-\end{spec}
+\begin{theorem}[Thinning Theorem]
+\label{thm:thinning}
+{\rm Let |preceq| be a binary relation on |b| that is reflexive and transitive,
+and let |f :: a -> b -> P b| and |e :: P b|.
+If |f x| is monotonic on |succeq| for all |x|, we have
+\begin{equation}
+\setlength{\jot}{-1pt}
+\begin{split}
+&|foldR (\x -> thin_preceq . collect . (f x <=< mem)) (thin_preceq (collect e)) `sse`| \\
+& \qquad  |thin_preceq . collect . foldR f e  {-"~~."-}|
+\end{split}
+\label{eq:thinning}
+\end{equation}
+}
 %if False
 \begin{code}
 thmThinning :: (a -> b -> P b) -> P b -> List a -> P (T b)
 thmThinning f e =
   thin_Q . collect . foldR f e `spse`
-    foldR (\x -> thin_Q . collect . (f x <=< mem))
+    foldR (\x -> thin_Q. collect . (f x <=< mem))
        (thin_Q (collect e))
 \end{code}
 %endif
+\end{theorem}
 
 \subsection{Proof of the Thinning Theorem}
 
 \begin{proof}
-By the fixed-point property of |foldR|,
+By the fixed-point property of |foldR| \eqref{eq:foldR-comp}, to prove \eqref{eq:thinning} it is sufficient to show that:
 \begin{spec}
- (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs `sse`
-    (thin_Q . collect . foldR f e) (x : xs)
-<=>  {- definition of |foldR| -}
- (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs `sse`
-    thin_Q (collect (f x =<< foldR f e xs))
-<=>  {- abstracting away |xs| -}
-  (thin_Q . collect . (f x <=< mem)) <=< (thin_Q . collect . foldR f e) `sse`
-     thin_Q . collect . (f x <=< foldR f e) {-"~~."-}
+     (thin_preceq . collect . (f x <=< mem)) =<< (thin_preceq . collect . foldR f e) xs `sse`
+       (thin_preceq . collect . foldR f e) (x : xs)
+<=>      {- definition of |foldR| -}
+     (thin_preceq . collect . (f x <=< mem)) =<< (thin_preceq . collect . foldR f e) xs `sse`
+       thin_preceq (collect (f x =<< foldR f e xs))
+<=>     {- abstracting away |xs| -}
+     (thin_preceq . collect . (f x <=< mem)) <=< (thin_preceq . collect . foldR f e) `sse`
+       thin_preceq . collect . (f x <=< foldR f e) {-"~~."-}
 \end{spec}
 %if False
 \begin{code}
@@ -984,7 +1029,11 @@ propFixPoint2 f e x  =
   `sse` thin_Q . collect . (f x <=< foldR f e)
 \end{code}
 %endif
-According to the universal property of |thin_Q|, we only need to show that
+According to the universal property of |thin_preceq|, for the above to hold we need to show that
+\begin{spec}
+  mem <=< (thin_preceq . collect . (f x <=< mem)) <=< (thin_preceq . collect . foldR f e) `sse` f x <=< foldR f e {-"~~,"-}
+\end{spec}
+and that
 %if False
 \begin{code}
 pfThinThm2 :: (a -> b -> P b) -> P b -> a -> P (T b, b)
@@ -993,52 +1042,52 @@ pfThinThm2 f e x =
 %endif
 \begin{code}
      do  xs <- any
-         t0 <- (thin_Q . collect . (f x <=< mem)) =<< (thin_Q . collect . foldR f e) xs
-         b1 <- f x =<< foldR f e xs
-         return (t0, b1)
+         t1 <- (thin_preceq . collect . (f x <=< mem)) =<< (thin_preceq . collect . foldR f e) xs
+         y0 <- f x =<< foldR f e xs
+         return (t1, y0)
 ===  do  xs <- any
-         u0 <- (thin_Q . collect) (foldR f e xs)
-         t0 <- (thin_Q . collect . (f x <=< mem)) u0
-         y1 <- foldR f e xs
-         b1 <- f x y1
-         return (t0, b1)
+         u1 <- (thin_preceq . collect) (foldR f e xs)
+         t1 <- (thin_preceq . collect . (f x <=< mem)) u1
+         b0 <- foldR f e xs
+         y0 <- f x b0
+         return (t1, y0)
 `sse`  {- |thin| cancelation -}
-     do  (u0, y1) <- any
-         y0 <- mem u0
-         t0 <- (thin_Q . collect . (f x <=< mem)) u0
-         filt_Q (y0, y1)
-         b1 <- f x y1
-         return (t0, b1)
+     do  (u1, b0) <- any
+         b1 <- mem u1
+         filt preceq (b1, b0)
+         t1 <- (thin_preceq . collect . (f x <=< mem)) u1
+         y0 <- f x b0
+         return (t1, y0)
 `sse`  {- monotonicity -}
-     do  (u0, b1) <- any
-         y0 <- mem u0
-         b2 <- f x y0
-         filt_Q (b2, b1)
-         t0 <- (thin_Q . collect . (f x <=< mem)) u0
-         return (t0, b1)
+     do  (u1, y0) <- any
+         b1 <- mem u1
+         y1 <- f x b1
+         filt preceq (y1, y0)
+         t1 <- (thin_preceq . collect . (f x <=< mem)) u1
+         return (t1, y0)
 ===    {- monad laws -}
-     do  (u0, b1) <- any
-         b2 <- (f x <=< mem) u0
-         t0 <- (thin_Q . collect . (f x <=< mem)) u0
-         filt_Q (b2, b1)
-         return (t0, b1)
-`sse`  {- cancelation -}
-     do  (t0, b2, b1) <- any
-         b0 <- mem t0
-         filt_Q (b0, b2)
-         filt_Q (b2, b1)
-         return (t0, b1)
-`sse`  {- transitivity of |Q| -}
-     do  (t0, b1) <- any
-         b0 <- mem t0
-         filt_Q (b0, b1)
-         return (t0, b1) {-"~~."-}
+     do  (u1, y0) <- any
+         y1 <- (f x <=< mem) u1
+         filt preceq (y1, y0)
+         t1 <- (thin_preceq . collect . (f x <=< mem)) u1
+         return (t1, y0)
+`sse`  {- |thin| cancelation -}
+     do  (y0, t1, y1) <- any
+         y2 <- mem t1
+         filt preceq (y2, y1)
+         filt preceq (y1, y0)
+         return (t1, y0)
+`sse`  {- transitivity of |preceq| -}
+     do  (y0, t1) <- any
+         y2 <- mem t1
+         filt preceq (y2, y0)
+         return (t1, y0) {-"~~."-}
 \end{code}
 Note that the second "monotonicity" step is not quite the same as the
-monotonicity assumption --- |y0| is not drawn from |any|, but a result of
-|mem u0|. This is fine because
-|do {y0 <- mem u0 ...} | can be rewritten as
-|do {y0' <- mem u0; y0 <- any; filt (=) y0 y0' ... }|.
+monotonicity assumption --- |b1| is not drawn from |any|, but a result of
+|mem u1|. This is fine because
+|do {b1 <- mem u1 ...} | can be rewritten as
+|do {b1' <- mem u1; b1 <- any; filt (=) b1 b1' ... }|.
 \end{proof}
 
 \subsection{Example: Knapsack}
