@@ -354,9 +354,10 @@ It turns out that \eqref{eq:max-univ-set} can be rewritten monadically as below:
 \end{equation}
 In \eqref{eq:max-univ-monadic} and from now on we abuse the notation a bit,
 using |filt unrhd| to denote |filt (\(y,z) -> y `unrhd` z)|.
-The large pair of parentheses in \eqref{eq:max-univ-monadic} relates two monadic values. On the lefthand side we non-deterministically generate a pair of values |y1| and |y0|, which are respectively a result of |h| and |f| for an arbitrary input |x|. The inclusion says that |(y1, y0)| must be contained by the monad on the righthand side, which contains all pairs |(y1, y0)| as long as |y1 `unrhd` y0|.
+The large pair of parentheses in \eqref{eq:max-univ-monadic} relates two monadic values. On the lefthand side we generate a pair of values |y1| and |y0|, which are respectively results of |h| and |f| for the same, arbitrarily generated input |x|. The inclusion says that |(y1, y0)| must be contained by the monad on the righthand side, which consists of all pairs |(y1, y0)| as long as |y1 `unrhd` y0|.
 
-Letting |h = max . f| in \eqref{eq:max-univ-monadic}, we get the |max|-cancelation law:
+Letting |h = max| and |f = id| in \eqref{eq:max-univ-monadic}, we get |max `see` id| on the righthand side.
+Letting |h = max . f| in \eqref{eq:max-univ-monadic}, we get on the righthand side the |max|-cancelation law:
 \begin{equation}
 \setlength{\jot}{-1pt}
  \begin{aligned}
@@ -383,6 +384,13 @@ We may then manipulate expressions using properties of the |split| operator.
 The |max|-cancelation law is written as
 |split (max_unlhd . f) f =<< any {-"\,"-}`sse`{-"\,"-} filt unrhd =<< any|.
 
+Note again that |max_unlhd| does not assume much from |unlhd|.
+It is likely that there is no maximum in a set |xs| --- there is no element that is larger than every other element with respect to |unlhd|.
+In that case |max_unlhd xs| reduces to empty set (that is, |fail|).
+That is fine at the specification stage,
+although we might not be able to refine this specification to a total function.
+We will discuss about that soon.
+
 % Maximum is defined as the dual of minimum:
 % \begin{spec}
 %   max_unlhd = min_unrhd {-"~~."-}
@@ -403,7 +411,7 @@ propMaxJoin xss = max (join xss) === max (join (fmap max xss))
 Consider an input |xss :: P (P a)|, a set of sets, as the input for both sides. On the lefthand side, |xss| is joined into a single set, from which we keep the minimums. It is equivalent to the righthand side, where we choose the minimums of each of the sets in |xss|, before keeping their minimums.
 With \eqref{eq:MaxJoin} and the definition of |(>>=)| by |join| we can show how |max| promotes into |(=<<)| or |(<=<)|:
 \begin{equation}
-  |max (f <=< g) === max ((max . f) <=< g)| \mbox{~~.}
+  |max . (f <=< g) === max . ((max . f) <=< g)| \mbox{~~.}
    \label{eq:MaxKComp}
 \end{equation}
 %The proof goes:
@@ -432,7 +440,8 @@ member []        = mzero
 member (x : xs)  = return x <|> member xs {-"~~."-}
 \end{code}
 
-Monadic |max| can be refined to operate on lists. For non-empty |xs| we have
+In the last few steps of a program calculation we usually want to refine a monadic |max| to a function on lists.
+If |unlhd| is total (that is, for all |x| and |y| of the right type, at least one of |x `unrhd` y| or |y `unrhd` x| holds), and if |xs| is non-empty, we have
 \begin{equation}
  |return (maxlist xs) `sse` max_unlhd (member xs) | \label{eq:MaxMaxList}
 \end{equation}
@@ -443,6 +452,8 @@ where |maxlist| is some implementation of maximum on lists, e.g.
   maxlist (x : y : xs) = x `bmax` maxlist (y : ys) {-"~~,"-}
    where x `bmax` y  =if x `unrhd` y then x else y {-"~~."-}
 \end{spec}
+That |unlhd| being total guarantees that maximum exists for non-empty |xs|.
+The function |maxlist| may decide how to resolve a tie --- in the implementation above, for example, |maxlist| prefers elements that appears earlier in the list.
 
 \paragraph*{In the Agda Model}
 we implement |min| by:
