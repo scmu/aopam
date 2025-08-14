@@ -246,10 +246,9 @@ For example, |prefix [1,2,3]| yields four possibilities: |[]|, |[1]|, |[1,2]|, a
 Meanwhile, |prefixP :: List a -> P (List a)| defined below computes the non-empty prefixes:
 \begin{code}
 prefixP []      = fail
-prefixP [x]     = return [x]
 prefixP (x:xs)  = return [x] <|> (x:) <$> prefixP xs {-"~~."-}
 \end{code}
-It should be the case that |prefixP `sse` prefix|, which we will establish in the next section.
+We should have |prefixP `sse` prefix|, which we will discuss in the next section.
 
 Conversely, the function |suffix| non-deterministically returns a suffix of the given list:
 \begin{code}
@@ -319,7 +318,38 @@ Given |h :: List a -> P b|, the \emph{fixed-point properties}, that is, sufficie
 |h `sse` foldR f e| & |{-"~"-}<=={-"~"-} h [] `sse` e {-"\,"-}&&{-"\,"-} h (x:xs) `sse` f x =<< h xs  {-"~~."-}|
 \end{align}
 The properties above can be proved by routine induction on the input list.
-One may then prove the following |foldR| fusion rule:
+
+For an example, recall the function |prefixP|, defined in Section~\ref{sec:non-det-monad}, that computes non-empty prefixes.
+To show that |prefixP `sse` prefix|, one may perform induction on the input list, or use \eqref{eq:foldR-comp}.
+One would eventually get stuck and realise that we need to prove a stronger property:
+\begin{spec}
+  return [] <|> prefixP xs `sse` prefix xs {-"~~."-}
+\end{spec}
+This is a case where a stronger variation of a property is easier to prove!
+To prove the property above by \eqref{eq:foldR-comp}, we need to show that
+|return [] <||> fail `sse` return []|, which is immediate, and that
+\begin{spec}
+ return [] <|> prefixP (x:xs) `sse` pre x =<< (return [] <|> prefixP xs) {-"~~."-}
+\end{spec}
+We try to simply the more complex righthand side to the lefthand side.
+The proof proceeds by utilising monad laws and distributivity:
+\begin{spec}
+      pre x =<< (return [] <|> prefixP xs)
+ ===    {- |(=<<)| distributes into |(<||>)| -}
+      (pre x =<< return []) <|> (pre x =<< prefixP xs)
+ ===    {- definition of |pre|, monad laws -}
+      return [] <|> return [x] <|> (pre x =<< prefixP xs)
+ ===    {- definition of |pre| -}
+      return [] <|> return [x] <|> ((\ ys -> return [] <|> return (x : y)) =<< prefixP xs)
+ ===    {- |(=<<)| distributes into |(<||>)|, monad laws, definition of |(<$>)| -}
+      return [] <|> return [x] <|> return [] <|> (x:) <$> prefixP xs
+ ===    {- idempotency of |(<||>)|, definition of |prefixP|  -}
+      return [] <|> prefixP (x:xs) {-"~~."-}
+\end{spec}
+We wanted an inclusion but end up proving an equality.
+We have actually proved that |return [] <||> prefixP xs = prefix xs|.
+
+With the fixed-point properties, we can prove the following |foldR| fusion rule:
 \begin{equation}
   |foldR g (h e) `sse` h . foldR f e {-"~"-}<=={-"~"-} g x =<< h m `sse` h (f x =<< m) {-"~~."-}|
 \end{equation}
