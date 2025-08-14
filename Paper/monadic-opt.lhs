@@ -162,6 +162,7 @@ This article aims to show that reasoning about monadic programs is just like tha
 We introduce in this section the building blocks we need.
 
 \subsection{Nondeterminism Monad}
+\label{sec:non-det-monad}
 
 A monad consists of a type constructor |M| and operators |return :: a -> M a| and |(>>=) :: M a -> (a -> M b) -> M b| that satisfy the \emph{monad laws}:
 \begin{align*}
@@ -232,6 +233,33 @@ filt p x  | p x        = return x
 It returns its input |x| if it satisfies |p|, and fails otherwise.%
 \footnote{Conventionally there is a function |guard :: Bool -> M ()| that returns |()| when the input is true, and |filt p x| is defined by |do { guard (p x); return x }|. In this paper we try to introduce less construct and use only |filt|.}
 
+
+\paragraph*{Example: Prefixes and Suffixes.}~
+The function |prefix| non-deterministically computes a prefix of the given list:
+\begin{code}
+prefix :: List a -> P (List a)
+prefix []      = return []
+prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~."-}
+\end{code}
+For example, |prefix [1,2,3]| yields four possibilities: |[]|, |[1]|, |[1,2]|, and |[1,2,3]|.
+%format prefixP = "\Varid{prefix}^{+}"
+Meanwhile, |prefixP :: List a -> P (List a)| defined below computes the non-empty prefixes:
+\begin{code}
+prefixP []      = fail
+prefixP [x]     = return [x]
+prefixP (x:xs)  = return [x] <|> (x:) <$> prefixP xs {-"~~."-}
+\end{code}
+It should be the case that |prefixP `sse` prefix|, which we will establish in the next section.
+
+Conversely, the function |suffix| non-deterministically returns a suffix of the given list:
+\begin{code}
+suffix :: List a -> P (List a)
+suffix []      = return []
+suffix (x:xs)  = return (x:xs) <|> suffix xs {-"~~."-}
+\end{code}
+|suffix [1,2,3]| yields |[1,2,3]|, |[2,3]|, |[3]|, and |[]|.
+We get all segments of a list by |prefix <=< suffix|.
+
 \subsection{An Agda Model of Set Monad}
 
 To ensure that there is indeed a model of our set monad, we built one in Agda.
@@ -271,6 +299,20 @@ foldR :: (a -> b -> P b) -> P b -> List a -> P b
 foldR f e []      = e
 foldR f e (x:xs)  = f x =<< foldR f e xs {-"~~."-}
 \end{spec}
+The function |prefix| defined in Section~\ref{sec:non-det-monad} can be defined in terms of |foldR|:
+\begin{spec}
+prefix = foldR pre (return [])
+   where pre x ys = return [] <|> return (x : ys) {-"~~."-}
+\end{spec}
+%if False
+\begin{code}
+pre x ys = return [] <|> return (x : ys)
+\end{code}
+%endif
+Due to the way we define our |foldR|, the definition above returns |[]| more frequently than that in Section~\ref{sec:non-det-monad}.
+The equivalence of the two definitions of |prefix| depends on
+idempotency of the non-determinism monad.
+
 Given |h :: List a -> P b|, the \emph{fixed-point properties}, that is, sufficient conditions for |h| to contain or be contained by |foldR f e| are given by:
 \begin{align}
 |foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}| \label{eq:foldR-comp} \\
@@ -298,6 +340,115 @@ Finally, monadic |foldR| can be refined to pure |foldr| if both of its arguments
 |return (foldr f e) = foldR (\x -> return . f x) (return e) {-"~~."-}|
 \label{eq:foldr-foldR}
 \end{equation}
+
+\paragraph*{Scan and Its Properties}
+Introducing a |scanr| is often a key step in speeding up algorithms related to lists.
+For this article, we define a monadic variation of |scanr|:
+\begin{code}
+scanR :: (a -> b -> P b) -> P b -> List a -> P (List b)
+scanR f e []        = wrap <$> e
+scanR f e (x : xs)  = do  ys <- scanR f e xs
+                          z <- f x (head ys)
+                          return (z : ys) {-"~~,"-}
+\end{code}
+where |wrap x = [x]|.
+It is perhaps useful knowing that |scanR| is a |foldR|:
+\begin{spec}
+scanR f e = foldR f' (wrap <$> e)
+  where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
+\end{spec}
+
+We will need a number of properties relating scan and fold.
+To begin with:
+%if False
+\begin{code}
+-- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propHeadScanStmt f e xs =
+   head <$> scanR f e xs === foldR f e xs
+\end{code}
+%endif
+\begin{equation}
+  |head <$> scanR f e xs === foldR f e xs| \mbox{~~.} \label{eq:HeadScan}
+\end{equation}
+\begin{proof}
+Induction on |xs|. The case when |xs := []| is immediate.
+For |xs := x:xs| we reason:
+%if False
+\begin{code}
+-- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propHeadScanPfInd f e x xs =
+\end{code}
+%endif
+\begin{code}
+      head <$> scanR f e (x : xs)
+ ===    {- definition of |scanR| -}
+      head <$> do  ys <- scanR f e xs
+                   z <- f x (head ys)
+                   return (z : ys)
+ ===    {- definition of |(<$>)|, monad laws -}
+      do  ys <- scanR f e xs
+          z <- f x (head ys)
+          return z
+ ===    {- monad law -}
+      do  ys <- scanR f e xs
+          f x (head ys)
+ ===    {- |do|-notation -}
+      f x =<< (head <$> scanR f e xs)
+ ===    {- induction -}
+      f x =<< foldR f e xs
+ ===    {- definition of |foldR| -}
+      foldR f e (x : xs) {-"~~."-}
+\end{code}
+\end{proof}
+
+We also need a \emph{scan lemma} for monadic fold and scan:
+%if False
+\begin{code}
+propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propScanLemmaStmt f e =
+   foldR f e <=< suffix === member <=< scanR f e
+\end{code}
+%endif
+\begin{equation}
+  |foldR f e <=< suffix === member <=< scanR f e| \mbox{~~.}
+  \label{eq:ScanLemma}
+\end{equation}
+\begin{proof}
+Induction on the input. For the inductive case we reason:
+%if False
+\begin{code}
+proofScanLemmaInd :: (a -> b -> P b) -> P b -> a -> List a -> P b
+proofScanLemmaInd f e x xs =
+\end{code}
+%endif
+\begin{code}
+      foldR f e =<< suffix (x : xs)
+ ===  foldR f e =<< (return (x:xs) <|> suffix xs)
+ ===    {- |(=<<)| distributes into |(<||>)| -}
+      (foldR f e =<< return (x:xs)) <|> (foldR f e =<< suffix xs)
+ ===    {- induction -}
+      foldR f e (x : xs) <|> (member =<< scanR f e xs)
+ ===  (f x =<< foldR f e xs) <|> (member =<< scanR f e xs)
+ ===    {- \eqref{eq:HeadScan}: |head <$> scanR f e xs === foldR f e xs| -}
+      (f x =<< (head <$> scanR f e xs)) <|> (member =<< scanR f e xs)
+ ===  do  ys <- scanR f e xs
+          f x (head ys) <|> member ys
+ ===    {- check this -}
+      do  ys <- scanR f e xs
+          z <- f x (head ys)
+          return z <|> member ys
+ ===    {- definitions of |scanR| and |member| -}
+      member =<< scanR f e (x : xs) {-"~~."-}
+\end{code}
+\end{proof}
+
+Finally, from \eqref{eq:foldr-foldR} one can induce that |scarnR| with a
+deterministic step function is itself deterministic:
+\begin{align}
+  |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
+    \label{eq:scanr-scanR}
+\end{align}
+
 
 \subsection{Maximum}
 
@@ -356,7 +507,7 @@ In \eqref{eq:max-univ-monadic} and from now on we abuse the notation a bit,
 using |filt unrhd| to denote |filt (\(y,z) -> y `unrhd` z)|.
 The large pair of parentheses in \eqref{eq:max-univ-monadic} relates two monadic values. On the lefthand side we generate a pair of values |y1| and |y0|, which are respectively results of |h| and |f| for the same, arbitrarily generated input |x|. The inclusion says that |(y1, y0)| must be contained by the monad on the righthand side, which consists of all pairs |(y1, y0)| as long as |y1 `unrhd` y0|.
 
-Letting |h = max| and |f = id| in \eqref{eq:max-univ-monadic}, we get |max `see` id| on the righthand side.
+Letting |h = max| and |f = id| in \eqref{eq:max-univ-monadic}, we get |max `sse` id| on the righthand side.
 Letting |h = max . f| in \eqref{eq:max-univ-monadic}, we get on the righthand side the |max|-cancelation law:
 \begin{equation}
 \setlength{\jot}{-1pt}
@@ -374,7 +525,8 @@ Letting |h = max . f| in \eqref{eq:max-univ-monadic}, we get on the righthand si
  \label{eq:max-cancelation}
 \end{equation}
 
-By defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; return (y,z) }|,
+\noindent
+{\bf Note}: by defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; return (y,z) }|,
 \eqref{eq:max-univ-monadic} can be written more concisely as below:
 \begin{equation*}
 |h `sse` max_unlhd . f|\mbox{~~}|<==>|\mbox{~~} |h `sse` f &&|~
@@ -383,8 +535,9 @@ By defining the ``split'' operator |split f g x = do { y <- f x; z <- g x; retur
 We may then manipulate expressions using properties of the |split| operator.
 The |max|-cancelation law is written as
 |split (max_unlhd . f) f =<< any {-"\,"-}`sse`{-"\,"-} filt unrhd =<< any|.
+Unfortunately, in numerous occasions in calculation we need the flexibility provided by |do|-notation, therefore the split notation is not as useful as we would like. {\bf End of Note.}
 
-Note again that |max_unlhd| does not assume much from |unlhd|.
+Recall that |max_unlhd| does not assume much from |unlhd|.
 It is likely that there is no maximum in a set |xs| --- there is no element that is larger than every other element with respect to |unlhd|.
 In that case |max_unlhd xs| reduces to empty set (that is, |fail|).
 That is fine at the specification stage,
@@ -669,35 +822,6 @@ The reason for reviewing an old problem is to see whether our usual pattern of p
 factor segment problems into prefix-of-suffix problems, using ``scan'', etc,
 adapt smoothly into our new setting.
 
-Typically, to solve a problem on segments, we see it as solving a problem on prefixes for each of the suffixes of the input.
-The function |prefix| non-deterministically computes a prefix of the given list:
-\begin{code}
-prefix :: List a -> P (List a)
-prefix []      = return []
-prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~."-}
-\end{code}
-Instead of the inductive definition above, we will use a |foldR|-based definition here:
-\begin{spec}
-prefix = foldR pre (return [])
-   where pre x ys = return [] <|> return (x : ys) {-"~~."-}
-\end{spec}
-%if False
-\begin{code}
-pre x ys = return [] <|> return (x : ys)
-\end{code}
-%endif
-Due to the way we define our |foldR|, the second definition returns |[]| more frequently.
-The equivalence of the two definitions of |prefix| depends on
-idempotency of the non-determinism monad.
-
-Conversely, the function |suffix| non-deterministically returns a suffix of the given list:
-\begin{code}
-suffix :: List a -> P (List a)
-suffix []      = return []
-suffix (x:xs)  = return (x:xs) <|> suffix xs {-"~~."-}
-\end{code}
-We get all segments by |prefix <=< suffix|.
-
 Let |geqs| be defined by |xs `geqs` ys = sum xs >= sum ys|, therefore
 |max_leqs : P (List Int) -> P (List Int)| choose those lists having the largest sum.
 The \emph{maximum segment sum} problem can be defined by:
@@ -706,115 +830,6 @@ mss :: List Int -> P (List Int)
 mss = max_leqs . (prefix <=< suffix) {-"~~."-}
 \end{code}
 
-
-\subsubsection{Scan and Its Properties}
-
-A key step in speeding up the algorithm to |mss| is introducing |scanr|.
-For this article, we define a monadic variation of |scanr|:
-\begin{code}
-scanR :: (a -> b -> P b) -> P b -> List a -> P (List b)
-scanR f e []        = wrap <$> e
-scanR f e (x : xs)  = do  ys <- scanR f e xs
-                          z <- f x (head ys)
-                          return (z : ys) {-"~~,"-}
-\end{code}
-where |wrap x = [x]|.
-It is perhaps useful knowing that |scanR| is a |foldR|:
-\begin{spec}
-scanR f e = foldR f' (wrap <$> e)
-  where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
-\end{spec}
-
-We will need a number of properties relating scan and fold.
-To begin with:
-%if False
-\begin{code}
--- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
-propHeadScanStmt f e xs =
-   head <$> scanR f e xs === foldR f e xs
-\end{code}
-%endif
-\begin{equation}
-  |head <$> scanR f e xs === foldR f e xs| \mbox{~~.} \label{eq:HeadScan}
-\end{equation}
-\begin{proof}
-Induction on |xs|. The case when |xs := []| is immediate.
-For |xs := x:xs| we reason:
-%if False
-\begin{code}
--- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
-propHeadScanPfInd f e x xs =
-\end{code}
-%endif
-\begin{code}
-      head <$> scanR f e (x : xs)
- ===    {- definition of |scanR| -}
-      head <$> do  ys <- scanR f e xs
-                   z <- f x (head ys)
-                   return (z : ys)
- ===    {- definition of |(<$>)|, monad laws -}
-      do  ys <- scanR f e xs
-          z <- f x (head ys)
-          return z
- ===    {- monad law -}
-      do  ys <- scanR f e xs
-          f x (head ys)
- ===    {- |do|-notation -}
-      f x =<< (head <$> scanR f e xs)
- ===    {- induction -}
-      f x =<< foldR f e xs
- ===    {- definition of |foldR| -}
-      foldR f e (x : xs) {-"~~."-}
-\end{code}
-\end{proof}
-
-We also need a \emph{scan lemma} for monadic fold and scan:
-%if False
-\begin{code}
-propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
-propScanLemmaStmt f e =
-   foldR f e <=< suffix === member <=< scanR f e
-\end{code}
-%endif
-\begin{equation}
-  |foldR f e <=< suffix === member <=< scanR f e| \mbox{~~.}
-  \label{eq:ScanLemma}
-\end{equation}
-\begin{proof}
-Induction on the input. For the inductive case we reason:
-%if False
-\begin{code}
-proofScanLemmaInd :: (a -> b -> P b) -> P b -> a -> List a -> P b
-proofScanLemmaInd f e x xs =
-\end{code}
-%endif
-\begin{code}
-      foldR f e =<< suffix (x : xs)
- ===  foldR f e =<< (return (x:xs) <|> suffix xs)
- ===    {- |(=<<)| distributes into |(<||>)| -}
-      (foldR f e =<< return (x:xs)) <|> (foldR f e =<< suffix xs)
- ===    {- induction -}
-      foldR f e (x : xs) <|> (member =<< scanR f e xs)
- ===  (f x =<< foldR f e xs) <|> (member =<< scanR f e xs)
- ===    {- \eqref{eq:HeadScan}: |head <$> scanR f e xs === foldR f e xs| -}
-      (f x =<< (head <$> scanR f e xs)) <|> (member =<< scanR f e xs)
- ===  do  ys <- scanR f e xs
-          f x (head ys) <|> member ys
- ===    {- check this -}
-      do  ys <- scanR f e xs
-          z <- f x (head ys)
-          return z <|> member ys
- ===    {- definitions of |scanR| and |member| -}
-      member =<< scanR f e (x : xs) {-"~~."-}
-\end{code}
-\end{proof}
-
-Finally, from \eqref{eq:foldr-foldR} one can induce that |scarnR| with a
-deterministic step function is itself deterministic:
-\begin{align}
-  |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
-    \label{eq:scanr-scanR}
-\end{align}
 
 \subsubsection{The Main Derivation}
 
@@ -962,6 +977,10 @@ propThinUniv x s =
                    return (t0, b1))
 \end{code}
 %endif
+Letting |h := thin_preceq . collect| and |f := id| in \eqref{eq:thin-univ-monadic}, we get
+\begin{equation}
+    |mem <=< (thin_preceq . collect) `sse` id|
+\end{equation}
 Letting |h = thin_preceq . collect . f|, we have the cancelation law:
 \begin{equation}
 \setlength{\jot}{-1pt}
