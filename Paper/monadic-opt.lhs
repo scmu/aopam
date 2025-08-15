@@ -242,6 +242,9 @@ prefix []      = return []
 prefix (x:xs)  = return [] <|> (x:) <$> prefix xs {-"~~."-}
 \end{code}
 For example, |prefix [1,2,3]| yields four possibilities: |[]|, |[1]|, |[1,2]|, and |[1,2,3]|.
+With idempotency of |(<||>)|, by a simple case analysis one can show that |return [] <||> prefix xs = prefix xs| for all |xs|.
+Therefore we have |return [] `sse` prefix xs|.
+
 %format prefixP = "\Varid{prefix}^{+}"
 Meanwhile, |prefixP :: List a -> P (List a)| defined below computes the non-empty prefixes:
 \begin{code}
@@ -311,43 +314,78 @@ pre x ys = return [] <|> return (x : ys)
 Due to the way we define our |foldR|, the definition above returns |[]| more frequently than that in Section~\ref{sec:non-det-monad}.
 The equivalence of the two definitions of |prefix| depends on
 idempotency of the non-determinism monad.
+Similarly, |prefixP| is a |foldR|:
+%format preP = "\Varid{pre}^{+}"
+\begin{spec}
+prefixP = foldR preP (return [])
+   where pre x ys = return [x] <|> return (x : ys) {-"~~."-}
+\end{spec}
 
 Given |h :: List a -> P b|, the \emph{fixed-point properties}, that is, sufficient conditions for |h| to contain or be contained by |foldR f e| are given by:
 \begin{align}
-|foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}| \label{eq:foldR-comp} \\
-|h `sse` foldR f e| & |{-"~"-}<=={-"~"-} h [] `sse` e {-"\,"-}&&{-"\,"-} h (x:xs) `sse` f x =<< h xs  {-"~~."-}|
+|foldR f e `sse` h| & |{-"~"-}<=={-"~"-} e `sse` h [] {-"\,"-}&&{-"\,"-} f x =<< h xs `sse` h (x:xs)  {-"~~,"-}| \label{eq:foldRPrefixPt} \\
+|h `sse` foldR f e| & |{-"~"-}<=={-"~"-} h [] `sse` e {-"\,"-}&&{-"\,"-} h (x:xs) `sse` f x =<< h xs  {-"~~."-}| \label{eq:foldRSuffixPt}
 \end{align}
 The properties above can be proved by routine induction on the input list.
 
-For an example, recall the function |prefixP|, defined in Section~\ref{sec:non-det-monad}, that computes non-empty prefixes.
-To show that |prefixP `sse` prefix|, one may perform induction on the input list, or use \eqref{eq:foldR-comp}.
-One would eventually get stuck and realise that we need to prove a stronger property:
+For an example, to show that |prefixP `sse` prefix|, one may perform induction on the input list or use the fixed-point property \eqref{eq:foldRPrefixPt}, exploiting the fact that |prefixP| is a |foldR|.
+Through the latter route, one need to show that |fail `sse` return []|,
+and that |preP x =<< prefix xs `sse` prefix (x:xs)|.
+Proof of the latter proceeds by utilising monad laws and distributivity:
 \begin{spec}
-  return [] <|> prefixP xs `sse` prefix xs {-"~~."-}
+        preP x =<< prefix xs
+ ===      {- definition of |preP| -}
+        (\ys -> return [x] <|> return (x:ys)) =<< prefix xs
+ ===      {- |(=<<)| distributes into |(<||>)| -}
+        ((\ys -> return [x]) =<< prefix xs) <|> ((\ys -> return (x:ys)) =<< prefix xs)
+ ===      {- monad laws, definition of |(<$>)| -}
+        return [x] <|> (x:) <$> prefix xs
+ ===      {- definition of |(<$>)|, distributivity -}
+        (x:) <$> (return [] <|> prefix xs)
+ ===      {- since |return [] `sse` prefix xs|, or |return [] <||> prefix xs = prefix xs| -}
+        (x:) <$> prefix xs
+ `sse`    {- since |m `sse` n <||> m| for all |m|, |n| -}
+        return [] <|> (x:) <$> prefix xs
+ ===      {- definition of |pre|, distributivity and monad laws -}
+        pre x =<< prefix xs
+ ===      {- definition of |prefix| -}
+        prefix (x:xs) {-"~~."-}
+\end{spec}
+Alternatively, one may use \eqref{eq:foldRSuffixPt} and exploit the fact that
+|prefix| is a |foldR|. One would eventually get stuck and realise that we need to prove a stronger property:
+\begin{spec}
+   return [] <|> prefixP xs `sse` prefix xs {-"~~."-}
 \end{spec}
 This is a case where a stronger variation of a property is easier to prove!
-To prove the property above by \eqref{eq:foldR-comp}, we need to show that
-|return [] <||> fail `sse` return []|, which is immediate, and that
-\begin{spec}
- return [] <|> prefixP (x:xs) `sse` pre x =<< (return [] <|> prefixP xs) {-"~~."-}
-\end{spec}
-We try to simply the more complex righthand side to the lefthand side.
-The proof proceeds by utilising monad laws and distributivity:
-\begin{spec}
-      pre x =<< (return [] <|> prefixP xs)
- ===    {- |(=<<)| distributes into |(<||>)| -}
-      (pre x =<< return []) <|> (pre x =<< prefixP xs)
- ===    {- definition of |pre|, monad laws -}
-      return [] <|> return [x] <|> (pre x =<< prefixP xs)
- ===    {- definition of |pre| -}
-      return [] <|> return [x] <|> ((\ ys -> return [] <|> return (x : y)) =<< prefixP xs)
- ===    {- |(=<<)| distributes into |(<||>)|, monad laws, definition of |(<$>)| -}
-      return [] <|> return [x] <|> return [] <|> (x:) <$> prefixP xs
- ===    {- idempotency of |(<||>)|, definition of |prefixP|  -}
-      return [] <|> prefixP (x:xs) {-"~~."-}
-\end{spec}
-We wanted an inclusion but end up proving an equality.
-We have actually proved that |return [] <||> prefixP xs = prefix xs|.
+The actual proof is left to the readers as an exercise.
+
+% One would eventually get stuck and realise that we need to prove a stronger property:
+% \begin{spec}
+%   return [] <|> prefixP xs `sse` prefix xs {-"~~."-}
+% \end{spec}
+% This is a case where a stronger variation of a property is easier to prove!
+% To prove the property above by \eqref{eq:foldRPrefixPt}, we need to show that
+% |return [] <||> fail `sse` return []|, which is immediate, and that
+% \begin{spec}
+%  return [] <|> prefixP (x:xs) `sse` pre x =<< (return [] <|> prefixP xs) {-"~~."-}
+% \end{spec}
+% We try to simply the more complex righthand side to the lefthand side.
+% The proof proceeds by utilising monad laws and distributivity:
+% \begin{spec}
+%       pre x =<< (return [] <|> prefixP xs)
+%  ===    {- |(=<<)| distributes into |(<||>)| -}
+%       (pre x =<< return []) <|> (pre x =<< prefixP xs)
+%  ===    {- definition of |pre|, monad laws -}
+%       return [] <|> return [x] <|> (pre x =<< prefixP xs)
+%  ===    {- definition of |pre| -}
+%       return [] <|> return [x] <|> ((\ ys -> return [] <|> return (x : y)) =<< prefixP xs)
+%  ===    {- |(=<<)| distributes into |(<||>)|, monad laws, definition of |(<$>)| -}
+%       return [] <|> return [x] <|> return [] <|> (x:) <$> prefixP xs
+%  ===    {- idempotency of |(<||>)|, definition of |prefixP|  -}
+%       return [] <|> prefixP (x:xs) {-"~~."-}
+% \end{spec}
+% We wanted an inclusion but end up proving an equality.
+% We have actually proved that |return [] <||> prefixP xs = prefix xs|.
 
 With the fixed-point properties, we can prove the following |foldR| fusion rule:
 \begin{equation}
@@ -358,7 +396,7 @@ With the fixed-point properties, we can prove the following |foldR| fusion rule:
 %format f1
 %format e0
 %format e1
-With \eqref{eq:foldR-comp} it is easy to show that |foldR| is monotonic:
+With \eqref{eq:foldRPrefixPt} it is easy to show that |foldR| is monotonic:
 \begin{equation}
 |foldR f0 e0 `sse` foldR f1 e1 {-"~"-}<=={-"~"-} f0 `sse` f1 && e0 `sse` e1  {-"~~."-}|
 \label{eq:foldR-monotonicity}
@@ -373,6 +411,16 @@ Finally, monadic |foldR| can be refined to pure |foldr| if both of its arguments
 
 \paragraph*{Scan and Its Properties}
 Introducing a |scanr| is often a key step in speeding up algorithms related to lists.
+For those who not familiar with it, |scanr :: (a -> b -> b) -> b -> List a -> List b|
+is like |foldr|, but records the intermediate results of each step in a list.
+For example, while |foldr (+) 0| computes the sum of a list, |scanr (+) 0| computes the running sum: |scanr (+) 0 [1,2,3] = [1+(2+(3+0)), 2+(3+0), 3+0, 0]| |= [6,5,3,0]|.
+An important property of |scanr| is the following \emph{scan lemma}:
+\begin{spec}
+  scanr f e = map (foldr f e) . tails {-"~~,"-}
+\end{spec}
+where |tails :: List a -> List (List a)| returns all the suffixes of the input list.
+That is, |scanr| computes |foldr| for every suffix of the input.
+
 For this article, we define a monadic variation of |scanr|:
 \begin{code}
 scanR :: (a -> b -> P b) -> P b -> List a -> P (List b)
@@ -382,14 +430,67 @@ scanR f e (x : xs)  = do  ys <- scanR f e xs
                           return (z : ys) {-"~~,"-}
 \end{code}
 where |wrap x = [x]|.
-It is perhaps useful knowing that |scanR| is a |foldR|:
+With |f| and |e| being non-deterministic, |scanR f e| returns a set of all possible lists.
+\todo{example.}
+
+The function |scanR| can be defined in terms of a |foldR|:
 \begin{spec}
 scanR f e = foldR f' (wrap <$> e)
   where f' x ys = do {z <- f x (head ys); return (z:ys)} {-"~~."-}
 \end{spec}
+Therefore, from \eqref{eq:foldr-foldR} one can induce that |scanR| with a
+deterministic step function is itself deterministic:
+\begin{align}
+  |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
+    \label{eq:scanr-scanR}
+\end{align}
 
-We will need a number of properties relating scan and fold.
-To begin with:
+The main property of |scanR| that we need for this article is the monadic variation of \emph{scan lemma}:
+%if False
+\begin{code}
+propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
+propScanLemmaStmt f e =
+   member <=< scanR f e === foldR f e <=< suffix
+\end{code}
+%endif
+\begin{equation}
+  |member <=< scanR f e === foldR f e <=< suffix | \mbox{~~.}
+  \label{eq:ScanLemma}
+\end{equation}
+That is, every element in any list computed by |scanR| is a result of |foldR| applied to some suffix of the input, and vice versa.
+\begin{proof}
+Induction on the input. For the inductive case we reason:
+%if False
+\begin{code}
+proofScanLemmaInd :: (a -> b -> P b) -> P b -> a -> List a -> P b
+proofScanLemmaInd f e x xs =
+\end{code}
+%endif
+\begin{code}
+      foldR f e =<< suffix (x : xs)
+ ===    {- definition of |suffix| -}
+      foldR f e =<< (return (x:xs) <|> suffix xs)
+ ===    {- |(=<<)| distributes into |(<||>)| -}
+      (foldR f e =<< return (x:xs)) <|> (foldR f e =<< suffix xs)
+ ===    {- induction -}
+      foldR f e (x : xs) <|> (member =<< scanR f e xs)
+ ===    {- definition of |foldR| -}
+      (f x =<< foldR f e xs) <|> (member =<< scanR f e xs)
+ ===    {- by \eqref{eq:HeadScan}: |head <$> scanR f e xs === foldR f e xs| -}
+      (f x =<< (head <$> scanR f e xs)) <|> (member =<< scanR f e xs)
+ ===    {- distributivity between |(=<<)| and |(<||>)|, switching to |do|-notation -}
+      do  ys <- scanR f e xs
+          f x (head ys) <|> member ys
+ ===    {- monad laws -}
+      do  ys <- scanR f e xs
+          z <- f x (head ys)
+          return z <|> member ys
+ ===    {- definitions of |scanR| and |member| -}
+      member =<< scanR f e (x : xs) {-"~~."-}
+\end{code}
+\end{proof}
+In the last few steps of the proof we find it more comprehensible to use the |do|-notation.
+In the proof we needed the property that the head of the list returned by |scanR| is always the result of |foldR| applied to the entire list:
 %if False
 \begin{code}
 -- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
@@ -400,15 +501,14 @@ propHeadScanStmt f e xs =
 \begin{equation}
   |head <$> scanR f e xs === foldR f e xs| \mbox{~~.} \label{eq:HeadScan}
 \end{equation}
-\begin{proof}
-Induction on |xs|. The case when |xs := []| is immediate.
-For |xs := x:xs| we reason:
+% \begin{proof}
+% Induction on |xs|. The case when |xs := []| is immediate.
+% For |xs := x:xs| we reason:
 %if False
 \begin{code}
 -- propHeadScanStmt :: (a -> b -> P b) -> P b -> List a -> P b
 propHeadScanPfInd f e x xs =
 \end{code}
-%endif
 \begin{code}
       head <$> scanR f e (x : xs)
  ===    {- definition of |scanR| -}
@@ -429,56 +529,9 @@ propHeadScanPfInd f e x xs =
  ===    {- definition of |foldR| -}
       foldR f e (x : xs) {-"~~."-}
 \end{code}
-\end{proof}
-
-We also need a \emph{scan lemma} for monadic fold and scan:
-%if False
-\begin{code}
-propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
-propScanLemmaStmt f e =
-   foldR f e <=< suffix === member <=< scanR f e
-\end{code}
 %endif
-\begin{equation}
-  |foldR f e <=< suffix === member <=< scanR f e| \mbox{~~.}
-  \label{eq:ScanLemma}
-\end{equation}
-\begin{proof}
-Induction on the input. For the inductive case we reason:
-%if False
-\begin{code}
-proofScanLemmaInd :: (a -> b -> P b) -> P b -> a -> List a -> P b
-proofScanLemmaInd f e x xs =
-\end{code}
-%endif
-\begin{code}
-      foldR f e =<< suffix (x : xs)
- ===  foldR f e =<< (return (x:xs) <|> suffix xs)
- ===    {- |(=<<)| distributes into |(<||>)| -}
-      (foldR f e =<< return (x:xs)) <|> (foldR f e =<< suffix xs)
- ===    {- induction -}
-      foldR f e (x : xs) <|> (member =<< scanR f e xs)
- ===  (f x =<< foldR f e xs) <|> (member =<< scanR f e xs)
- ===    {- \eqref{eq:HeadScan}: |head <$> scanR f e xs === foldR f e xs| -}
-      (f x =<< (head <$> scanR f e xs)) <|> (member =<< scanR f e xs)
- ===  do  ys <- scanR f e xs
-          f x (head ys) <|> member ys
- ===    {- check this -}
-      do  ys <- scanR f e xs
-          z <- f x (head ys)
-          return z <|> member ys
- ===    {- definitions of |scanR| and |member| -}
-      member =<< scanR f e (x : xs) {-"~~."-}
-\end{code}
-\end{proof}
-
-Finally, from \eqref{eq:foldr-foldR} one can induce that |scarnR| with a
-deterministic step function is itself deterministic:
-\begin{align}
-  |scanR (\x -> return . f x) (return e)| ~&=~ |return . scanr f e| \mbox{~~.}
-    \label{eq:scanr-scanR}
-\end{align}
-
+%\end{proof}
+Proof of \eqref{eq:HeadScan} is a routine induction, which we leave to the reader as an exercise.
 
 \subsection{Maximum}
 
@@ -712,9 +765,9 @@ The aim is to prove \eqref{eq:greedy} given that the monotonicity condition hold
 There are various ways one can proceed.
 We may apply both sides of \eqref{eq:greedy} to a list, and go with a usual inductive proof.
 To go for the most concise proof one may use the |foldR| fusion theorem.
-We will go for something in the middle: using the fixed-point property \eqref{eq:foldR-comp}. This way we do not get the shortest proof, but we get to demonstrate more tricks that may be useful in reasoning about monadic programs.
+We will go for something in the middle: using the fixed-point property \eqref{eq:foldRPrefixPt}. This way we do not get the shortest proof, but we get to demonstrate more tricks that may be useful in reasoning about monadic programs.
 
-By the fixed-point property \eqref{eq:foldR-comp}, to establish \eqref{eq:greedy} we ought to prove that
+By the fixed-point property \eqref{eq:foldRPrefixPt}, to establish \eqref{eq:greedy} we ought to prove that
 \begin{spec}
   max e `sse` max (foldR f e []) &&
   (max . f x) =<< max (foldR f e xs) `sse` max (foldR f e (x : xs)) {-"~~."-}
@@ -1059,7 +1112,7 @@ thmThinning f e =
 \subsection{Proof of the Thinning Theorem}
 
 \begin{proof}
-By the fixed-point property of |foldR| \eqref{eq:foldR-comp}, to prove \eqref{eq:thinning} it is sufficient to show that:
+By the fixed-point property of |foldR| \eqref{eq:foldRPrefixPt}, to prove \eqref{eq:thinning} it is sufficient to show that:
 \begin{spec}
      (thin_preceq . collect . (f x <=< mem)) =<< (thin_preceq . collect . foldR f e) xs `sse`
        (thin_preceq . collect . foldR f e) (x : xs)
