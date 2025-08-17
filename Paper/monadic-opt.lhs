@@ -313,7 +313,7 @@ pre x ys = return [] <|> return (x : ys)
 %endif
 Due to the way we define our |foldR|, the definition above returns |[]| more frequently than that in Section~\ref{sec:non-det-monad}.
 The equivalence of the two definitions of |prefix| depends on
-idempotency of the non-determinism monad.
+commutativity and idempotency of |(<||>)|.
 Similarly, |prefixP| is a |foldR|:
 %format preP = "\Varid{pre}^{+}"
 \begin{spec}
@@ -328,8 +328,10 @@ Given |h :: List a -> P b|, the \emph{fixed-point properties}, that is, sufficie
 \end{align}
 The properties above can be proved by routine induction on the input list.
 
-For an example, to show that |prefixP `sse` prefix|, one may perform induction on the input list or use the fixed-point property \eqref{eq:foldRPrefixPt}, exploiting the fact that |prefixP| is a |foldR|.
-Through the latter route, one need to show that |fail `sse` return []|,
+For an example, consider showing that |prefixP `sse` prefix|.
+One may go back to the basics and use an induction on the input list.
+Alternatively, one may use the fixed-point property \eqref{eq:foldRPrefixPt}, exploiting the fact that |prefixP| is a |foldR|.
+Through the latter route, one needs to show that |fail `sse` return []|,
 and that |preP x =<< prefix xs `sse` prefix (x:xs)|.
 Proof of the latter proceeds by utilising monad laws and distributivity:
 \begin{spec}
@@ -351,8 +353,9 @@ Proof of the latter proceeds by utilising monad laws and distributivity:
  ===      {- definition of |prefix| -}
         prefix (x:xs) {-"~~."-}
 \end{spec}
-Alternatively, one may use \eqref{eq:foldRSuffixPt} and exploit the fact that
-|prefix| is a |foldR|. One would eventually get stuck and realise that we need to prove a stronger property:
+Yet another approach is to use \eqref{eq:foldRSuffixPt} and exploit the fact that
+|prefix| is a |foldR|.
+One would eventually get stuck and realise that we need to prove a stronger property:
 \begin{spec}
    return [] <|> prefixP xs `sse` prefix xs {-"~~."-}
 \end{spec}
@@ -409,7 +412,7 @@ Finally, monadic |foldR| can be refined to pure |foldr| if both of its arguments
 \label{eq:foldr-foldR}
 \end{equation}
 
-\paragraph*{Scan and Its Properties}
+\paragraph*{Scan and Its Properties.}~
 Introducing a |scanr| is often a key step in speeding up algorithms related to lists.
 For those who not familiar with it, |scanr :: (a -> b -> b) -> b -> List a -> List b|
 is like |foldr|, but records the intermediate results of each step in a list.
@@ -445,7 +448,7 @@ deterministic step function is itself deterministic:
     \label{eq:scanr-scanR}
 \end{align}
 
-The main property of |scanR| that we need for this article is the monadic variation of \emph{scan lemma}:
+The main property of |scanR| that we need for this article is a monadic variation of \emph{scan lemma}:
 %if False
 \begin{code}
 propScanLemmaStmt :: (a -> b -> P b) -> P b -> List a -> P b
@@ -555,7 +558,7 @@ In calculation, we often want to refine expressions of the form |max . f| where 
 \label{eq:max-univ-set}
 \end{equation}
 Properties \eqref{eq:max-def-set} and \eqref{eq:max-univ-set} are equivalent.
-\todo{argue for that}
+To prove \eqref{eq:max-def-set} from \eqref{eq:max-univ-set}, for instance, one let |h = const ys| and |f = const xs|.
 
 The aim of our work, however, is to capture the ideas above in a monadic notation, such that programs can be manipulated and reasoned about in the monadic language.
 It turns out that \eqref{eq:max-univ-set} can be rewritten monadically as below:
@@ -647,9 +650,10 @@ propMaxJoin xss = max (join xss) === max (join (fmap max xss))
 Consider an input |xss :: P (P a)|, a set of sets, as the input for both sides. On the lefthand side, |xss| is joined into a single set, from which we keep the minimums. It is equivalent to the righthand side, where we choose the minimums of each of the sets in |xss|, before keeping their minimums.
 With \eqref{eq:MaxJoin} and the definition of |(>>=)| by |join| we can show how |max| promotes into |(=<<)| or |(<=<)|:
 \begin{equation}
-  |max . (f <=< g) === max . ((max . f) <=< g)| \mbox{~~.}
+  |max . (f <=< g) === max . ((max . f) <=< g)| \mbox{~~,}
    \label{eq:MaxKComp}
 \end{equation}
+or |max (f =<< g x) === max ((max . f) =<< g x)| for all |x|.
 %The proof goes:
 %%if False
 %\begin{code}
@@ -681,7 +685,7 @@ If |unlhd| is total (that is, for all |x| and |y| of the right type, at least on
 \begin{equation}
  |return (maxlist xs) `sse` max_unlhd (member xs) | \label{eq:MaxMaxList}
 \end{equation}
-where |maxlist| is some implementation of maximum on lists, e.g.
+where |maxlist| is some implementation of maximum on non-empty lists, e.g.
 \begin{spec}
   maxlist :: List a -> a
   maxlist [x] = x
@@ -696,7 +700,7 @@ we implement |min| by:
 
 \todo{more here.}
 
-It is then proved in Agda that the above implementation satisfies \eqref{eq:min-univ-monadic}.
+It is then proved in Agda that the above implementation satisfies \eqref{eq:max-univ-monadic}.
 
 \section{The Greedy Theorem}
 
@@ -799,7 +803,10 @@ For the second conjunct, we need to prove that:
        & |filt unrhd (y1, y0)|
  \end{aligned}\mbox{~~.}
 \end{equation*}
-It is usually easier to start from the smaller side (the lefthand side) and stepwise relaxing to to a larger monad. Using associative of |(=<<)| and definition of |do|-notation, the lefthand side expands to:
+It is usually easier to start from the smaller side (the lefthand side) and stepwise relaxing to to a larger monad (the righthand side).
+That is, given the lefthand side we wish to show that |filt unrhd (y1, y0)|, or |y1 `unrhd` y0|, holds.
+Since |y1| is generated by some |max|, the |max|-cancelation law might help to guarantee that it is a preferred solution. However, we need to split |(max . f x) =<< max (foldR f e xs)| into parts to use the |max|-cancelation law.
+Using associative of |(=<<)| and definition of |do|-notation, the lefthand side expands to:
 \begin{spec}
 do  xs <- any
     b1 <- max (foldR f e xs)
@@ -808,8 +815,8 @@ do  xs <- any
     y0 <- f x b0
     return (y1, y0) {-"~~."-}
 \end{spec}
-Having both |max (foldR f e xs)| and |foldR f e xs| inspires us to use the |max|-cancelation law.
-To use the law, notice that lines generating |xs|, |b1|, and |b0| match that of the lefthand side of \eqref{eq:max-cancelation}, therefore we rewrite them accordingly to the righthand side:
+Now, having both |max (foldR f e xs)| and |foldR f e xs| allows us to use the |max|-cancelation law.
+To apply the law, notice that lines generating |xs|, |b1|, and |b0| match that of the lefthand side of \eqref{eq:max-cancelation}, therefore we rewrite them accordingly to the righthand side:
 \begin{spec}
        ...
 `sse`   {- |max|-cancelation -}
@@ -902,7 +909,7 @@ The first step can be carried out by |min|-cancelation with |f := id|. The rest 
 To see an application of the Greedy Theorem, we consider the classical maximum segment sum again,
 but return the list instead of the sum.
 The reason for reviewing an old problem is to see whether our usual pattern of problem solving:
-factor segment problems into prefix-of-suffix problems, using ``scan'', etc,
+factor segment problems into prefix-of-suffix problems, introducing a ``scan'', etc,
 adapt smoothly into our new setting.
 
 Let |geqs| be defined by |xs `geqs` ys = sum xs >= sum ys|, therefore
@@ -912,7 +919,6 @@ The \emph{maximum segment sum} problem can be defined by:
 mss :: List Int -> P (List Int)
 mss = max_leqs . (prefix <=< suffix) {-"~~."-}
 \end{code}
-
 
 \subsubsection{The Main Derivation}
 
@@ -925,8 +931,9 @@ derMSSMain =
 %endif
 \begin{code}
          max . (prefix <=< suffix)
- ===     max . ((max . prefix) <=< suffix)
- `spse`      {- greedy theorem -}
+ ===         {- by \eqref{eq:MaxKComp} -}
+         max . ((max . prefix) <=< suffix)
+ `spse`      {- Greedy Theorem \eqref{eq:greedy} -}
          max . (foldR maxPre (return []) <=< suffix)
  ===         {- scan lemma \eqref{eq:ScanLemma} -}
          max . (member <=< scanR maxPre (return []))
@@ -941,11 +948,23 @@ where |maxPre :: a -> List a -> P (List a)| and
 |zplus :: a -> List a -> List a| are given by:
 \begin{code}
 maxPre  x     = max . pre x {-"~~,"-}
-zplus   x xs  = if x + sum xs < 0 then [] else (x:xs) {-"~~."-}
+zplus   x ys  = if x + sum ys <= 0 then [] else (x:ys) {-"~~."-}
 \end{code}
+The function |maxPre x| is simply the composition of |max| and |pre x|, as demanded by the Greedy Theorem.
+While |pre x ys| returns either |[]| or |x : ys|, |maxPre x| returns one among the two that has a larger sum.
+The case when there is a tie (that is, when the sum of |x:ys| is |sum [] = 0|) is left for |zplus| to resolve.
+Our |zplus| defined above prefers |[]| when there is a tie, but it could have made another choice by substituting |(<)| for |(<=)|.
+The result would still meet the specification.
 
-\paragraph*{Use of Greedy Theorem}
-The greedy theorem helps to establish that
+The final one-liner algorithm
+\begin{spec}
+  maxlist . scanr zplus []
+\end{spec}
+is the famous linear-time algorithm for the maximum segment sum problem ---
+if we assume that |sum ys| can be computed in constant time, which could be done by a datatype refinement storing the sum together with the list.
+
+\paragraph*{The Monotonicity Condition.}~
+The greedy theorem helped to establish that
 %if False
 \begin{code}
 -- derMSSMain :: (a -> b -> P b) -> P b -> a -> List a -> P b
@@ -1099,7 +1118,7 @@ If |f x| is monotonic on |succeq| for all |x|, we have
 \end{equation}
 }
 %if False
-\begin{code}
+xtxttx\begin{code}
 thmThinning :: (a -> b -> P b) -> P b -> List a -> P (T b)
 thmThinning f e =
   thin_Q . collect . foldR f e `spse`
