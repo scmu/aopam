@@ -393,6 +393,7 @@ The actual proof is left to the readers as an exercise.
 With the fixed-point properties, we can prove the following |foldR| fusion rule:
 \begin{equation}
   |foldR g (h e) `sse` h . foldR f e {-"~"-}<=={-"~"-} g x =<< h m `sse` h (f x =<< m) {-"~~."-}|
+  \label{eq:foldRFusion}
 \end{equation}
 
 %format f0
@@ -920,7 +921,7 @@ mss :: List Int -> P (List Int)
 mss = max_leqs . (prefix <=< suffix) {-"~~."-}
 \end{code}
 
-\subsubsection{The Main Derivation}
+\paragraph*{The Main Derivation}
 
 The main derivation goes:
 %if False
@@ -1035,7 +1036,88 @@ proofMonoMSS x =
             return (ys1, zs0)  {-"~~."-}
 \end{code}
 
-\section{The Thinning Theorem}
+\section{Thinning Algorithms}
+
+Consider again our generic problem speficication: |max_unlhd . foldR f e|.
+For many problems, the monotonicity condition \eqref{eq:monotonicity} is a lot to demand --- it is not always the case that |f| satisfies \eqref{eq:monotonicity} with respect to |unlhd|.
+It is more common that |f| satisfies \eqref{eq:monotonicity} with respect to some other ordering, say, |preceq|, a stronger variation of |unlhd|.
+The catch, however, is that |preceq| is not total.
+The Greedy Theorem still holds, but refines the specification to a monadic program that does not return results for most if not all inputs.
+For such situations we need another theorem.
+
+Let us look at an example.
+
+\subsection{Example: Knapsack}
+
+In the famous \emph{knapsack} problem, we are given a collection of items, each having a value and a weight --- for simplity we assume that both are natural numbers. The aim is to choose a subset of the items such that the total value is maximised, while the total weight does not exceed a given weight limit |wlim|.
+Let |Val|, |Wgt| respectively denote the types of values and weights.
+We can abstractly represent our input as a list of pairs |List (Val, Wgt)|, where
+\begin{spec}
+val = sum . map fst {-"~~,"-}
+wgt = sum . map snd {-"~~."-}
+\end{spec}
+The function |subseq| non-deterministically computes a subsequence of the input list:
+\begin{spec}
+subseq :: List a -> P (List a)
+subseq []      = return []
+subseq (x:xs)  = subseq xs <|> ((x:) <$> subseq xs) {-"~~."-}
+\end{spec}
+For example, |subseq "abc"| returns
+the empty string |""|, |"c"|, |"b"|, |"bc"|, |"a"|, |"ac"|, |"ab"|, and |"abc"|.
+The function |subseq| can also be written as a |foldR|:
+\begin{spec}
+subseq = foldR subs (return []) {-"~~,"-}
+  where subs x y = return y <|> return (x:y) {-"~~."-}
+\end{spec}
+
+The \emph{knapsack} problem can be specified by:
+\begin{spec}
+knapsack :: List (Val, Wgt) -> P (List (Val, Wgt))
+knapsack = max_leqv . (filt ((wlim >) . wgt) <=< subseq) {-"~~."-}
+\end{spec}
+where |xs `leqv` ys = val xs <= val ys|.
+
+\paragraph*{Fusion.}~
+To transform to the specification to our generic form, we try to fuse |filt ((w >) . wgt) <=< subseq| into one |foldR|.
+Accroding to the |foldR| fusion rule \eqref{eq:foldRFusion}:
+\begin{equation*}
+  |foldR g (h e) `sse` h . foldR f e {-"~"-}<=={-"~"-} g x =<< h m `sse` h (f x =<< m) {-"~~,"-}|
+\end{equation*}
+%For the base case, we assume that |w| is non-negative, therefore |filt ((w >) . wgt) [] = return []| holds.
+if we manange to construct some function |subsw| that satisfies the fusion condition:
+\begin{equation}
+ |subsw x =<< (filt ((w>).wgt) =<< m) `sse` filt ((w>).wgt) =<< (subs x =<< m) {-"~~."-}|
+ \label{eq:filtSubseqFusionCond}
+\end{equation}
+We will have
+\begin{spec}
+  foldR subsw (return []) {-"~"-}`sse`{-"~"-} filt ((w >) . wgt) <=< subseq {-"~~."-}
+\end{spec}
+(For the base case, we assume that |w| is non-negative, therefore |filt ((w >) . wgt) [] = return []| holds.)
+To construct |subsw|, one may start from the righthand side of \eqref{eq:filtSubseqFusionCond} and try to distribute |filt ((w>).wgt)| inside until it is applied to |m|.
+One will eventually construct:
+\begin{spec}
+  subsw x ys = return ys <|> filt ((w>).wgt) (x:ys) {-"~~."-}
+\end{spec}
+The details are left to the reader as an exercise. The specification is now:
+\begin{spec}
+  knapsack = max_leqv . foldR subsw (return [])  {-"~~."-}
+\end{spec}
+
+It turns out, however, that |subsw| does not meet \eqref{eq:monotonicity} with respect to |leqv|.
+For a counter example,
+\todo{yeah, a counter example.}
+
+\todo{motivate |leqvw|}
+\begin{spec}
+xs `leqvw` ys = val xs <= val ys && wgt xs >= wgt ys {-"~~."-}
+\end{spec}
+However, |leqvw| is not connected. For example, neither |(10,9) `leqvw` (9,10)| nor |(10,9) `geqvw` (9,10)| holds, and |max_leqvw {(10,9), (9,10)}| yields the empty set.
+Therefore, while one may apply the Greedy Theorem to |max_leqvw . foldR subsw (return [])|, it does not give us a useful algorithm.
+
+\todo{motivate thinning.}
+
+\subsection{Thinning}
 
 
 The function |thin_preceq| now has type |T b -> P (T b)|.
@@ -1101,6 +1183,7 @@ Letting |h = thin_preceq . collect . f|, we have the cancelation law:
   \end{aligned}
 \end{equation}
 
+\subsection{The Thinning Theorem}
 
 The thinning theorem is given by:
 \begin{theorem}[Thinning Theorem]
@@ -1222,9 +1305,7 @@ monotonicity assumption --- |b1| is not drawn from |any|, but a result of
 |do {b1' <- mem u1; b1 <- any; filt (=) b1 b1' ... }|.
 \end{proof}
 
-\subsection{Example: Knapsack}
 
-\todo{Or MSS with upper bound on length?}
 
 \section{Conclusions}
 
